@@ -1,0 +1,91 @@
+:root{
+  --kanban-col-bg: rgba(255,255,255,.85);
+  --card-hover: rgba(13,110,253,.07);
+}
+
+body {
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(13,110,253,.10), transparent),
+              radial-gradient(900px 500px at 90% 0%, rgba(25,135,84,.10), transparent),
+              radial-gradient(900px 500px at 50% 110%, rgba(108,117,125,.10), transparent);
+  min-height: 100vh;
+}
+
+.navbar-brand{
+  letter-spacing: .3px;
+}
+
+.kanban-col{
+  background: var(--kanban-col-bg);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 1rem;
+  padding: .75rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+}
+
+.kanban-col h6{
+  margin: 0;
+}
+
+.task-card{
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: .9rem;
+  transition: transform .08s ease, background-color .08s ease;
+}
+
+.task-card:hover{
+  transform: translateY(-1px);
+  background-color: var(--card-hover);
+}
+
+.badge-soft{
+  background: rgba(13,110,253,.10);
+  color: rgb(13,110,253);
+  border: 1px solid rgba(13,110,253,.20);
+}
+
+.badge-soft-green{
+  background: rgba(25,135,84,.12);
+  color: rgb(25,135,84);
+  border: 1px solid rgba(25,135,84,.22);
+}
+
+.badge-soft-gray{
+  background: rgba(108,117,125,.12);
+  color: rgb(108,117,125);
+  border: 1px solid rgba(108,117,125,.22);
+}
+
+.badge-soft-red{
+  background: rgba(220,53,69,.12);
+  color: rgb(220,53,69);
+  border: 1px solid rgba(220,53,69,.22);
+}
+
+.small-muted{ color: rgba(33,37,41,.65); }
+
+.progress {
+  height: .55rem;
+  border-radius: 999px;
+}
+
+.card-meta{
+  display:flex;
+  gap:.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-icon{
+  border-radius: .75rem;
+}
+
+.subtask-item{
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: .75rem;
+  padding: .5rem .65rem;
+  background: rgba(255,255,255,.7);
+}
+
+.table thead th{
+  font-weight: 600;
+}

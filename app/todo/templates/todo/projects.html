@@ -1,0 +1,90 @@
+{% extends 'todo/base.html' %}
+
+{% block title %} - プロジェクト{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">プロジェクト</h1>
+    <div class="text-secondary small">タスクを束ねて管理できます。チームに紐づけると共有プロジェクトになります。</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        {% if projects %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>名前</th>
+                  <th>スコープ</th>
+                  <th class="text-end">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in projects %}
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">{{ p.name }}</div>
+                      {% if p.description %}
+                        <div class="small text-secondary">{{ p.description }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if p.team %}
+                        <span class="badge text-bg-info"><i class="bi bi-people"></i> {{ p.team.name }}</span>
+                      {% else %}
+                        <span class="badge text-bg-light text-dark"><i class="bi bi-person"></i> 個人</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <form method="post" action="{{ url_for('todo.project_delete', project_id=p.id) }}" class="d-inline" onsubmit="return confirm('削除しますか？（プロジェクト内のタスクも削除されます）')">
+                        {{ delete_form.hidden_tag() }}
+                        <button class="btn btn-sm btn-outline-danger" type="submit" title="削除">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-secondary">まだプロジェクトがありません。</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h2 class="h6">新規作成</h2>
+        <form method="post">
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.name.label(class_='form-label') }}
+            {{ form.name(class_='form-control', placeholder='例：今年を充実させる') }}
+            {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.description.label(class_='form-label') }}
+            {{ form.description(class_='form-control', rows='3', placeholder='任意') }}
+          </div>
+          <div class="mb-3">
+            {{ form.team_id.label(class_='form-label') }}
+            {{ form.team_id(class_='form-select') }}
+          </div>
+          <div class="d-grid">
+            {{ form.submit(class_='btn btn-primary') }}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'todo/base.html' %}
+
+{% block title %} - 新規登録{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div class="rounded-circle bg-success-subtle text-success d-grid" style="width:36px; height:36px; place-items:center;">
+            <i class="bi bi-person-plus"></i>
+          </div>
+          <h1 class="h5 mb-0">新規登録</h1>
+        </div>
+        <div class="text-secondary small mb-3">ユーザー名とパスワードを設定してください。</div>
+
+        <form method="post" class="vstack gap-3">
+          {{ form.hidden_tag() }}
+
+          <div>
+            <label class="form-label">{{ form.username.label.text }}</label>
+            {{ form.username(class_='form-control', placeholder='例) hayato', autocomplete='username') }}
+            {% for e in form.username.errors %}
+              <div class="text-danger small mt-1">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div>
+            <label class="form-label">{{ form.password.label.text }}</label>
+            {{ form.password(class_='form-control', placeholder='6文字以上', autocomplete='new-password') }}
+            {% for e in form.password.errors %}
+              <div class="text-danger small mt-1">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div>
+            <label class="form-label">{{ form.password2.label.text }}</label>
+            {{ form.password2(class_='form-control', placeholder='もう一度入力', autocomplete='new-password') }}
+            {% for e in form.password2.errors %}
+              <div class="text-danger small mt-1">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="d-grid gap-2">
+            {{ form.submit(class_='btn btn-success') }}
+            <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">ログインへ</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
