@@ -109,7 +109,11 @@ class User(UserMixin, db.Model):
 # Flask-Login がセッションからユーザーを復元する際に呼ばれるコールバック
 @login.user_loader
 def load_user(user_id: str):
-    return User.query.get(int(user_id))
+    try:
+        parsed_user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.get(User, parsed_user_id)
 
 
 class Project(db.Model):

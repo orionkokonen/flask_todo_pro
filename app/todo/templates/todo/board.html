@@ -117,15 +117,13 @@
                       {% endif %}
                     {% endif %}
 
-                    {% if t.subtasks.count() %}
-                      {% set done_cnt = t.subtasks.filter_by(done=True).count() %}
-                      {% set total_cnt = t.subtasks.count() %}
-                      {% set pct = (done_cnt * 100 // total_cnt) if total_cnt else 0 %}
+                    {% set subtask_progress = task_subtask_progress.get(t.id, {'done': 0, 'total': 0, 'percent': 0}) %}
+                    {% if subtask_progress.total %}
                       <span class="badge text-bg-light text-dark" title="サブタスク進捗">
-                        <i class="bi bi-list-check me-1"></i>{{ done_cnt }}/{{ total_cnt }}
+                        <i class="bi bi-list-check me-1"></i>{{ subtask_progress.done }}/{{ subtask_progress.total }}
                       </span>
                       <div class="progress w-100" style="height:6px">
-                        <div class="progress-bar" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar" role="progressbar" style="width: {{ subtask_progress.percent }}%" aria-valuenow="{{ subtask_progress.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
                       </div>
                     {% endif %}
                   </div>

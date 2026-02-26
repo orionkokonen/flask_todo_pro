@@ -1,3 +1,5 @@
+from urllib.parse import urljoin, urlparse
+
 from flask import render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required
 
@@ -5,6 +7,15 @@ from app.auth import bp
 from app import db
 from app.models import User
 from app.forms import RegistrationForm, LoginForm
+
+
+def _is_safe_redirect_target(target: str) -> bool:
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return (
+        test_url.scheme in ("http", "https")
+        and ref_url.netloc == test_url.netloc
+    )
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
@@ -30,7 +41,9 @@ def login():
             login_user(user, remember=form.remember_me.data)
             # 未ログイン時にアクセスしようとしたページに戻す。
             # next パラメータがない場合はボードトップへ。
-            next_page = request.args.get("next") or url_for("todo.board")
+            next_page = request.args.get("next")
+            if not next_page or not _is_safe_redirect_target(next_page):
+                next_page = url_for("todo.board")
             return redirect(next_page)
         flash("ユーザー名またはパスワードが違います。")
     return render_template("auth/login.html", form=form)

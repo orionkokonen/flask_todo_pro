@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import case, func
+from sqlalchemy.orm import selectinload
 
 from app import db
 from app.forms import AddMemberForm, EmptyForm, ProjectForm, SubTaskForm, TaskForm, TeamForm
@@ -44,12 +46,22 @@ def _ensure_project_access(project: Project) -> None:
     ビューの至る所でこの関数を呼ぶことで、認可チェックの漏れを防ぐ。
     """
     if not project.can_access(current_user):
+        current_app.logger.warning(
+            "project access forbidden: user_id=%s project_id=%s",
+            getattr(current_user, "id", None),
+            project.id,
+        )
         abort(403)
 
 
 def _ensure_task_access(task: Task) -> None:
     """アクセス権のないタスクへのアクセスを 403 で拒否する。"""
     if not task.can_access(current_user):
+        current_app.logger.warning(
+            "task access forbidden: user_id=%s task_id=%s",
+            getattr(current_user, "id", None),
+            task.id,
+        )
         abort(403)
 
 
@@ -79,12 +91,14 @@ def board():
     q = (request.args.get("q") or "").strip()
     show_done = request.args.get("show_done", default="1", type=str) == "1"
 
-    projects = _accessible_projects().order_by(Project.name).all()
+    projects = _accessible_projects().options(selectinload(Project.team)).order_by(Project.name).all()
 
     team_ids = _accessible_team_ids()
 
     # project_id が NULL のタスクは「作成者本人の個人タスク」として扱う
-    base = Task.query.outerjoin(Project)
+    base = Task.query.outerjoin(Project).options(
+        selectinload(Task.project).selectinload(Project.team)
+    )
 
     personal_projects = (Project.team_id.is_(None) & (Project.owner_id == current_user.id))
     team_projects = (Project.team_id.in_(team_ids) if team_ids else False)
@@ -113,6 +127,34 @@ def board():
     # 締切日 NULL を後ろに、次に締切日昇順、最後に更新日降順で並べる
     tasks = base.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.updated_at.desc()).all()
 
+    task_ids = [t.id for t in tasks]
+    subtask_progress_by_task_id = {
+        task_id: {"done": 0, "total": 0, "percent": 0}
+        for task_id in task_ids
+    }
+    if task_ids:
+        progress_rows = (
+            db.session.query(
+                SubTask.task_id,
+                func.count(SubTask.id).label("total"),
+                func.coalesce(
+                    func.sum(case((SubTask.done.is_(True), 1), else_=0)),
+                    0,
+                ).label("done"),
+            )
+            .filter(SubTask.task_id.in_(task_ids))
+            .group_by(SubTask.task_id)
+            .all()
+        )
+        for task_id, total, done in progress_rows:
+            total_count = int(total or 0)
+            done_count = int(done or 0)
+            subtask_progress_by_task_id[task_id] = {
+                "done": done_count,
+                "total": total_count,
+                "percent": (done_count * 100 // total_count) if total_count else 0,
+            }
+
     def by_status(s: str):
         return [t for t in tasks if t.status == s]
 
@@ -133,6 +175,7 @@ def board():
         scope=scope,
         q=q,
         show_done=show_done,
+        task_subtask_progress=subtask_progress_by_task_id,
         today=date.today(),
     )
 
@@ -374,9 +417,23 @@ def project_delete(project_id: int):
 
     # 個人プロジェクトは本人のみ削除可能
     if p.is_personal and p.owner_id != current_user.id:
+        current_app.logger.warning(
+            "project delete forbidden: user_id=%s project_id=%s reason=not_personal_owner",
+            current_user.id,
+            p.id,
+        )
+        abort(403)
+
+    if p.is_team and (p.team is None or p.team.owner_id != current_user.id):
+        current_app.logger.warning(
+            "project delete forbidden: user_id=%s project_id=%s reason=not_team_owner",
+            current_user.id,
+            p.id,
+        )
         abort(403)
 
     # チームプロジェクトはメンバーなら削除可能（運用によりownerのみにしたければここで制限）
+    # Team projects are restricted to owner-only delete.
     db.session.delete(p)
     db.session.commit()
     flash("プロジェクトを削除しました。")
