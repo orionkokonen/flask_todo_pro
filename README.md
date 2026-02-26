@@ -6,7 +6,7 @@
 
 ## Demo（公開URL）
 
-- 公開URL（Render）：`https://xxxx.onrender.com`（※デプロイ後にここを更新）
+- 公開URL（Render）：`https://flask-todo-pro-pwa.onrender.com`（※デプロイ後にここを更新）
 - ソースコード（GitHub）：`https://github.com/xxxx/xxxx`
 
 ※ `http://127.0.0.1:5000/` は「自分のPCだけ」で開けるURLです。面接官が触れるのは **Renderの公開URL** になります。
