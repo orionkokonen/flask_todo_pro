@@ -11,7 +11,12 @@ from app.models import Project, SubTask, Task, Team, TeamMember, User
 from app.todo import bp
 
 
+# --- アクセス可能なリソースを絞り込む共通ヘルパー ---
+# ビューごとに同じクエリを書かず、ここに集約することで
+# 「自分のリソースしか見えない」という制御を一元管理する。
+
 def _accessible_team_ids() -> list[int]:
+    """現在のユーザーが所属するチームの ID リストを返す。"""
     return [
         tm.team_id
         for tm in TeamMember.query.filter_by(user_id=current_user.id).all()
@@ -19,6 +24,11 @@ def _accessible_team_ids() -> list[int]:
 
 
 def _accessible_projects():
+    """現在のユーザーがアクセスできる全プロジェクトのクエリを返す。
+
+    個人プロジェクト（所有者が自分）とチームプロジェクト（所属チーム）を
+    union して返すことで、どちらも同一の扱いができる。
+    """
     team_ids = _accessible_team_ids()
 
     personal = Project.query.filter_by(owner_id=current_user.id, team_id=None)
@@ -29,16 +39,25 @@ def _accessible_projects():
 
 
 def _ensure_project_access(project: Project) -> None:
+    """アクセス権のないプロジェクトへのアクセスを 403 で拒否する。
+
+    ビューの至る所でこの関数を呼ぶことで、認可チェックの漏れを防ぐ。
+    """
     if not project.can_access(current_user):
         abort(403)
 
 
 def _ensure_task_access(task: Task) -> None:
+    """アクセス権のないタスクへのアクセスを 403 で拒否する。"""
     if not task.can_access(current_user):
         abort(403)
 
 
 def _project_choices():
+    """TaskForm / ProjectForm 向けに、ユーザーが選択できるプロジェクト一覧を返す。
+
+    チーム名も括弧で表示することで、どのチームのプロジェクトか判断しやすくする。
+    """
     projects = _accessible_projects().order_by(Project.name.asc()).all()
     choices = []
     for p in projects:
@@ -54,7 +73,7 @@ def _project_choices():
 @bp.route("/", methods=["GET"])
 @login_required
 def board():
-    # Filters
+    # クエリパラメータでフィルタリング条件を受け取る
     project_id = request.args.get("project", type=int)
     scope = request.args.get("scope", default="all", type=str)
     q = (request.args.get("q") or "").strip()
@@ -62,27 +81,28 @@ def board():
 
     projects = _accessible_projects().order_by(Project.name).all()
 
-    # apply scope filter
     team_ids = _accessible_team_ids()
 
-    # NOTE: project未所属（project_id IS NULL）は「作成者の個人タスク」として扱う
+    # project_id が NULL のタスクは「作成者本人の個人タスク」として扱う
     base = Task.query.outerjoin(Project)
 
     personal_projects = (Project.team_id.is_(None) & (Project.owner_id == current_user.id))
     team_projects = (Project.team_id.in_(team_ids) if team_ids else False)
     unassigned = (Task.project_id.is_(None) & (Task.created_by_id == current_user.id))
 
+    # scope パラメータで「個人」「チーム」「全部」を切り替える
     if scope == "personal":
         base = base.filter(personal_projects | unassigned)
     elif scope == "team":
         base = base.filter(team_projects) if team_ids else base.filter(False)
     else:
-        # all: personal + team + unassigned
+        # all: 個人・チーム・未所属のすべてを表示
         base = base.filter(personal_projects | team_projects | unassigned)
 
     if project_id:
         base = base.filter(Task.project_id == project_id)
 
+    # キーワード検索: タイトル・説明を部分一致で絞り込む
     if q:
         like = f"%{q}%"
         base = base.filter(Task.title.ilike(like) | Task.description.ilike(like))
@@ -90,11 +110,13 @@ def board():
     if not show_done:
         base = base.filter(Task.status != Task.STATUS_DONE)
 
+    # 締切日 NULL を後ろに、次に締切日昇順、最後に更新日降順で並べる
     tasks = base.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.updated_at.desc()).all()
 
     def by_status(s: str):
         return [t for t in tasks if t.status == s]
 
+    # ステータス別に分けてカンバン列として渡す
     columns = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),
@@ -121,7 +143,7 @@ def task_new():
     form = TaskForm()
     form.project_id.choices = [("", "— プロジェクトなし —")] + _project_choices()
 
-    # Default status (e.g. /tasks/new?status=WISH)
+    # URL クエリパラメータでデフォルトステータスを指定できる（例: ?status=WISH）
     preset_status = (request.args.get("status") or "").upper()
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
@@ -130,6 +152,7 @@ def task_new():
         project = None
         if form.project_id.data is not None:
             project = Project.query.get_or_404(form.project_id.data)
+            # プロジェクト ID を直接指定するため、そのプロジェクトへのアクセス権も確認する
             _ensure_project_access(project)
 
         task = Task(
@@ -152,6 +175,7 @@ def task_new():
 @login_required
 def task_detail(task_id: int):
     task = Task.query.get_or_404(task_id)
+    # URL のタスク ID が改ざんされても、アクセス権のないタスクは 403 を返す
     _ensure_task_access(task)
 
     subtask_form = SubTaskForm()
@@ -161,12 +185,13 @@ def task_detail(task_id: int):
 
     subtasks = task.subtasks.order_by(SubTask.created_at.asc()).all()
 
+    # サブタスクの進捗率を計算してテンプレートに渡す
     total = task.subtasks.count()
     done = task.subtasks.filter_by(done=True).count() if total else 0
     percent = (done * 100 // total) if total else 0
     progress = {"done": done, "total": total, "percent": percent}
 
-    # due meta
+    # 締切日のメタ情報をまとめてテンプレートへ渡す
     if task.due_date:
         dr = (task.due_date - date.today()).days
         meta = {
@@ -204,6 +229,7 @@ def task_edit(task_id: int):
         project = None
         if form.project_id.data is not None:
             project = Project.query.get_or_404(form.project_id.data)
+            # 編集時も変更先プロジェクトへのアクセス権を再確認する
             _ensure_project_access(project)
 
         task.title = form.title.data
@@ -244,6 +270,7 @@ def task_move(task_id: int):
     _ensure_task_access(task)
 
     new_status = (request.form.get("status") or request.form.get("to") or "").upper()
+    # VALID_STATUSES によるホワイトリスト検証で、不正なステータス値を弾く
     if new_status not in Task.VALID_STATUSES:
         abort(400)
 
@@ -280,6 +307,7 @@ def subtask_add(task_id: int):
 def subtask_toggle(subtask_id: int):
     st = SubTask.query.get_or_404(subtask_id)
     task = st.task
+    # サブタスクのアクセス権は親タスクのアクセス権に従う
     _ensure_task_access(task)
 
     st.done = not st.done
@@ -307,12 +335,11 @@ def projects():
     form = ProjectForm()
     delete_form = EmptyForm()
 
-    # team choices
     team_ids = _accessible_team_ids()
     teams = Team.query.filter(Team.id.in_(team_ids)).order_by(Team.name).all() if team_ids else []
     form.team_id.choices = [(0, "（個人）")] + [(t.id, t.name) for t in teams]
 
-    # accessible projects
+    # 自分がアクセスできるプロジェクトのみ表示する
     projs = _accessible_projects().order_by(Project.created_at.desc()).all()
 
     if form.validate_on_submit():
@@ -321,7 +348,7 @@ def projects():
             team = None
         else:
             team = Team.query.get_or_404(team_id)
-            # must be member
+            # フォームに存在しないチーム ID を直接 POST されても、メンバーでなければ拒否する
             if not TeamMember.is_member(current_user.id, team.id):
                 abort(403)
 
@@ -367,9 +394,12 @@ def teams():
     if form.validate_on_submit():
         t = Team(name=form.name.data, owner_id=current_user.id)
         db.session.add(t)
+        # flush() でチームの id を確定させてから TeamMember に使う。
+        # commit() 前でも DB にレコードが仮挿入され、主キーが割り当てられる。
         db.session.flush()
 
-        # owner as member
+        # チーム作成者を owner ロールで自動追加する。
+        # これにより作成者が自分のチームを確実に参照・操作できる。
         db.session.add(TeamMember(team_id=t.id, user_id=current_user.id, role="owner"))
         db.session.commit()
         flash("チームを作成しました。")
@@ -383,12 +413,14 @@ def teams():
 def team_detail(team_id: int):
     team = Team.query.get_or_404(team_id)
 
+    # チームメンバーでないユーザーは詳細ページ自体を見せない
     if not TeamMember.is_member(current_user.id, team.id):
         abort(403)
 
     form = AddMemberForm()
     remove_form = EmptyForm()
 
+    # メンバー一覧: owner を先頭に、次いでユーザー名昇順で表示する
     members = (
         TeamMember.query.filter_by(team_id=team.id)
         .join(User, User.id == TeamMember.user_id)
@@ -403,6 +435,7 @@ def team_detail(team_id: int):
             flash("そのユーザー名は見つかりませんでした。")
             return redirect(url_for("todo.team_detail", team_id=team.id))
 
+        # 既存メンバーの二重登録を防ぐ（DB の複合主キーでも弾けるが、UX のために先に確認）
         if TeamMember.is_member(user.id, team.id):
             flash("既にメンバーです。")
             return redirect(url_for("todo.team_detail", team_id=team.id))
@@ -426,15 +459,17 @@ def team_detail(team_id: int):
 def team_member_remove(team_id: int, user_id: int):
     team = Team.query.get_or_404(team_id)
 
+    # まずリクエスト送信者がチームメンバーかを確認する
     if not TeamMember.is_member(current_user.id, team.id):
         abort(403)
 
-    # ownerは外せない（シンプル設計）
+    # owner は退会させられない（チームが管理者不在になるのを防ぐシンプルな設計）
     tm = TeamMember.query.filter_by(team_id=team.id, user_id=user_id).first_or_404()
     if tm.role == "owner":
         abort(400)
 
-    # 退会操作は owner のみ許可（テンプレ側でも制御しているがサーバー側でも保証）
+    # 退会操作は owner のみ許可する。
+    # テンプレート側でも非表示にしているが、API を直接叩かれた場合に備えてサーバー側でも検証する。
     if current_user.id != team.owner_id:
         abort(403)
 

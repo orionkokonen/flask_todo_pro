@@ -18,7 +18,11 @@ from app.models import User, Task
 
 
 def optional_int(value):
-    """WTForms SelectField helper: '' -> None, otherwise int."""
+    """SelectField の coerce 関数。空文字・未選択 ("") を None に変換する。
+
+    WTForms の SelectField は選択なしの場合に空文字を返すため、
+    そのまま int() するとエラーになる。この関数で安全に None へ変換する。
+    """
     if value in (None, "", "None"):
         return None
     return int(value)
@@ -33,6 +37,7 @@ class RegistrationForm(FlaskForm):
         "パスワード",
         validators=[DataRequired(), Length(min=6)],
     )
+    # EqualTo("password") でパスワード確認フィールドとの一致をバリデーションする
     password2 = PasswordField(
         "パスワード（確認）",
         validators=[DataRequired(), EqualTo("password")],
@@ -40,6 +45,12 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField("登録")
 
     def validate_username(self, username):
+        """ユーザー名の重複をフォーム送信時に DB で確認する。
+
+        WTForms は validate_<field名> という名前のメソッドを自動的にカスタムバリデータとして実行する。
+        DB レベルの unique 制約だけに頼ると、エラーが例外として上がり UX が悪化するため、
+        ここで事前にチェックしてユーザーへ分かりやすいメッセージを返す。
+        """
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError("このユーザー名は既に使用されています。")
@@ -56,6 +67,7 @@ class TaskForm(FlaskForm):
     title = StringField("タイトル", validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("メモ", validators=[Optional(), Length(max=2000)])
 
+    # ステータスは自由入力ではなく選択式にして、不正な値が混入しないようにする
     status = SelectField(
         "種別 / 状態",
         choices=[
@@ -74,12 +86,17 @@ class TaskForm(FlaskForm):
         description="YYYY-MM-DD",
     )
 
+    # coerce=optional_int により、未選択時に None を返し、project_id なしも許容する
     project_id = SelectField("プロジェクト（任意）", coerce=optional_int, validators=[Optional()])
 
     submit = SubmitField("保存")
 
     def validate_due_date(self, due_date_field):
-        # 過去日を禁止しない（あえて許容）。必要ならここで弾ける。
+        """日付フィールドの型チェックを行うカスタムバリデータ。
+
+        過去日は意図的に許可している（過去の締切も登録・管理できるようにするため）。
+        型がおかしい場合のみエラーとする。
+        """
         if due_date_field.data and not isinstance(due_date_field.data, date):
             raise ValidationError("日付形式が正しくありません。")
 
@@ -88,6 +105,7 @@ class ProjectForm(FlaskForm):
     name = StringField("プロジェクト名", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("説明", validators=[Optional(), Length(max=2000)])
 
+    # team_id=0 を「個人プロジェクト」として扱う（ビュー側で 0 → None に変換）
     team_id = SelectField(
         "チーム（任意）",
         coerce=int,
@@ -113,6 +131,11 @@ class SubTaskForm(FlaskForm):
 
 
 class EmptyForm(FlaskForm):
-    """CSRFトークン用の空フォーム（削除・トグルなど）"""
+    """データフィールドを持たない CSRF 専用フォーム。
+
+    削除・完了トグルなどの操作はフォームデータがないが、
+    CSRF トークンを含む POST にしないと CSRF 攻撃に無防備になる。
+    このフォームを使うことでトークン検証だけを通せる。
+    """
 
     submit = SubmitField("送信")
