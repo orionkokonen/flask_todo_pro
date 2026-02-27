@@ -183,6 +183,11 @@ def board():
 @bp.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def task_new():
+    """タスク新規作成。
+
+    入力バリデーションと認可を通過したデータのみ永続化し、
+    不正な project_id 直接指定を防ぐ。
+    """
     form = TaskForm()
     form.project_id.choices = [("", "— プロジェクトなし —")] + _project_choices()
 
@@ -206,6 +211,7 @@ def task_new():
             project=project,
             created_by=current_user,
         )
+        # ここで初めてDBへ確定保存する。検証前の入力は保存しない。
         db.session.add(task)
         db.session.commit()
         flash("タスクを追加しました。")
@@ -262,6 +268,10 @@ def task_detail(task_id: int):
 @bp.route("/tasks/<int:task_id>/edit", methods=["GET", "POST"])
 @login_required
 def task_edit(task_id: int):
+    """タスク編集。
+
+    所有/共有範囲の認可を再確認したうえで更新し、ID改ざんによる越権更新を防ぐ。
+    """
     task = Task.query.get_or_404(task_id)
     _ensure_task_access(task)
 
@@ -281,6 +291,7 @@ def task_edit(task_id: int):
         task.due_date = form.due_date.data
         task.project = project
 
+        # 変更確定は commit 時のみ。途中で失敗した場合はDB状態を保てる。
         db.session.commit()
         flash("更新しました。")
         return redirect(url_for("todo.task_detail", task_id=task.id))
@@ -297,7 +308,9 @@ def task_edit(task_id: int):
 @bp.route("/tasks/<int:task_id>/delete", methods=["POST"])
 @login_required
 def task_delete(task_id: int):
+    """タスク削除。認可済みリソースのみを削除対象にする。"""
     task = Task.query.get_or_404(task_id)
+    # 存在確認(404)と権限確認(403)を分離し、監査しやすい失敗理由にする。
     _ensure_task_access(task)
     db.session.delete(task)
     db.session.commit()
@@ -308,7 +321,10 @@ def task_delete(task_id: int):
 @bp.route("/tasks/<int:task_id>/move", methods=["POST"])
 @login_required
 def task_move(task_id: int):
-    """ステータス移動（ボード左右移動・詳細画面の変更に対応）"""
+    """ステータス移動（ボード左右移動・詳細画面の変更に対応）。
+
+    認可違反は 403、不正入力は 400 を返し、問題の種類を明確に分ける。
+    """
     task = Task.query.get_or_404(task_id)
     _ensure_task_access(task)
 

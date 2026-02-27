@@ -21,6 +21,11 @@ login.login_view = "auth.login"
 
 
 def create_app(config_overrides: dict[str, Any] | None = None):
+    """アプリ本体を組み立てるファクトリ関数。
+
+    依存（DB/認証/CSRF/マイグレーション）をここで一元初期化し、
+    実行環境ごとの差分は設定値だけで吸収する。
+    """
     app = Flask(__name__)
     app.config.from_object(Config)
     app.config["SQLALCHEMY_DATABASE_URI"] = Config.database_uri()
@@ -32,9 +37,13 @@ def create_app(config_overrides: dict[str, Any] | None = None):
     if config_overrides:
         app.config.update(config_overrides)
 
+    # セッション改ざん対策の鍵が無い状態で起動しないための安全装置。
+    # 「動くこと」より「安全に動くこと」を優先して明示的に失敗させる。
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY environment variable must be set.")
 
+    # 拡張機能はここで app に紐づける。migrate を有効にすることで、
+    # 起動時 create_all ではなく Alembic の履歴管理に統一できる。
     db.init_app(app)
     login.init_app(app)
     csrf.init_app(app)

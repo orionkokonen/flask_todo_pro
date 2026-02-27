@@ -10,6 +10,10 @@ from app.forms import RegistrationForm, LoginForm
 
 
 def _is_safe_redirect_target(target: str) -> bool:
+    """ログイン後遷移先が同一オリジンかを検証する。
+
+    外部URLへのリダイレクトを防ぎ、Open Redirect 脆弱性を回避する。
+    """
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return (
@@ -40,11 +44,13 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             # 未ログイン時にアクセスしようとしたページに戻す。
-            # next パラメータがない場合はボードトップへ。
+            # next パラメータがない、または外部URLならボードトップへ退避する。
+            # これにより、ログイン機能を悪用した外部誘導を防止する。
             next_page = request.args.get("next")
             if not next_page or not _is_safe_redirect_target(next_page):
                 next_page = url_for("todo.board")
             return redirect(next_page)
+        # 失敗理由を曖昧化して、ユーザー列挙のヒントを与えない。
         flash("ユーザー名またはパスワードが違います。")
     return render_template("auth/login.html", form=form)
 
