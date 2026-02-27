@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    startCommand: bash -lc "python -m flask --app wsgi.py db upgrade && gunicorn wsgi:app --bind 0.0.0.0:$PORT"
     envVars:
       - key: SECRET_KEY
         generateValue: true
