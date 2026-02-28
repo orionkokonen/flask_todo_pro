@@ -13,7 +13,7 @@ os.environ.setdefault("SECRET_KEY", "dev_secret_key_change_me")
 
 from app import create_app
 
-app = create_app()
+app = create_app({"DEBUG": True})
 
 if __name__ == "__main__":
     # debug=True でコード変更時の自動リロードとブラウザへのスタックトレース表示を有効にする。

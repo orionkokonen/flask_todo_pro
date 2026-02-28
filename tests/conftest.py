@@ -4,7 +4,7 @@
 - テストごとに tmp_path で一時 SQLite DB を作成し、テスト間のデータ混入を防ぐ。
 - WTF_CSRF_ENABLED=False にして CSRF トークン検証をスキップし、
   テストクライアントから直接 POST できるようにしている
-  （本番の CSRF 保護は別途 test_auth_security.py で確認する）。
+  （本番の CSRF 保護は別途専用テストで確認する）。
 - 各フィクスチャは app_context の外から呼ばれることを想定し、
   内部で app_context を明示的に取得している。
 """
@@ -17,38 +17,72 @@ import pytest
 
 from app import create_app, db
 from app.models import Project, Task, Team, TeamMember, User
+from app.security import auth_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def clear_rate_limiter():
+    auth_rate_limiter.clear()
+    yield
+    auth_rate_limiter.clear()
 
 
 @pytest.fixture
-def app(tmp_path):
+def app_factory(tmp_path):
+    created_apps = []
+
+    def _create_app(overrides: dict[str, Any] | None = None):
+        database_path = tmp_path / f"test_{len(created_apps)}.db"
+        config = {
+            "TESTING": True,
+            "SECRET_KEY": "test-secret",
+            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path}",
+            "WTF_CSRF_ENABLED": False,
+        }
+        if overrides:
+            config.update(overrides)
+
+        app = create_app(config)
+        with app.app_context():
+            db.create_all()
+
+        created_apps.append(app)
+        return app
+
+    yield _create_app
+
+    for app in reversed(created_apps):
+        with app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+
+@pytest.fixture
+def app(app_factory):
     """テスト専用の Flask アプリを生成する。
 
     tmp_path で一意な一時 DB を作るため、テスト間でデータが混ざらない。
     TESTING=True でエラーが例外として上がるようにし、
     WTF_CSRF_ENABLED=False でフォームの CSRF 検証を無効化して
     テストクライアントから直接 POST できるようにする。
-    テスト終了後は db.drop_all() でテーブルを削除してクリーンアップする。
+    既定では app_factory 経由で 1 つ生成し、終了時にクリーンアップする。
     """
-    database_path = tmp_path / "test.db"
-    app = create_app(
-        {
-            "TESTING": True,
-            "SECRET_KEY": "test-secret",
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path}",
-            "WTF_CSRF_ENABLED": False,
-        }
-    )
-
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.session.remove()
-        db.drop_all()
+    return app_factory()
 
 
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def csrf_app(app_factory):
+    return app_factory({"WTF_CSRF_ENABLED": True})
+
+
+@pytest.fixture
+def csrf_client(csrf_app):
+    return csrf_app.test_client()
 
 
 def _model_id(value: Any) -> int:

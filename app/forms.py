@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from flask import current_app
 from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
@@ -35,9 +36,7 @@ class RegistrationForm(FlaskForm):
     )
     password = PasswordField(
         "パスワード",
-        # 登録時の最小文字数は、既存のデモ運用・説明との整合を優先して
-        # 当面 min=6 を維持する。
-        validators=[DataRequired(), Length(min=6)],
+        validators=[DataRequired()],
     )
     # EqualTo("password") でパスワード確認フィールドとの一致をバリデーションする
     password2 = PasswordField(
@@ -56,6 +55,11 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError("このユーザー名は既に使用されています。")
+
+    def validate_password(self, password):
+        min_length = current_app.config.get("PASSWORD_MIN_LENGTH", 8)
+        if len(password.data or "") < min_length:
+            raise ValidationError(f"パスワードは{min_length}文字以上で入力してください。")
 
 
 class LoginForm(FlaskForm):

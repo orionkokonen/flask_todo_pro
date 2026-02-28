@@ -28,7 +28,7 @@
 
           <div>
             <label class="form-label">{{ form.password.label.text }}</label>
-            {{ form.password(class_='form-control', placeholder='6文字以上', autocomplete='new-password') }}
+            {{ form.password(class_='form-control', placeholder=password_min_length ~ '文字以上', autocomplete='new-password') }}
             {% for e in form.password.errors %}
               <div class="text-danger small mt-1">{{ e }}</div>
             {% endfor %}

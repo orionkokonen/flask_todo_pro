@@ -6,6 +6,9 @@ next パラメータの同一オリジン検証が正しく動作しているか
 """
 from __future__ import annotations
 
+from app.models import User
+
+
 def test_login_rejects_external_next_redirect(client, create_user):
     # 攻撃者が next=https://evil.com を埋め込んだリンクを踏ませた場合に、
     # 外部 URL へのリダイレクトがブロックされ、ボードトップへ戻ることを確認する。
@@ -35,3 +38,41 @@ def test_login_allows_safe_relative_next_redirect(client, create_user):
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/todo/projects")
+
+
+def test_register_rejects_password_shorter_than_min_length(app, client):
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "short_pw_user",
+            "password": "1234567",
+            "password2": "1234567",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "パスワードは8文字以上で入力してください。".encode("utf-8") in response.data
+
+    with app.app_context():
+        assert User.query.filter_by(username="short_pw_user").first() is None
+
+
+def test_register_accepts_password_with_min_length(app, client):
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "min_length_user",
+            "password": "12345678",
+            "password2": "12345678",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/auth/login")
+
+    with app.app_context():
+        user = User.query.filter_by(username="min_length_user").first()
+        assert user is not None
+        assert user.check_password("12345678")

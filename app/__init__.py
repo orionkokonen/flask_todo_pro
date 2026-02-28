@@ -19,6 +19,23 @@ migrate = Migrate()
 
 login.login_view = "auth.login"
 
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+        "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+        "img-src 'self' data:",
+        "font-src 'self' https://cdn.jsdelivr.net",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "manifest-src 'self'",
+        "worker-src 'self'",
+    ]
+)
+
 
 def create_app(config_overrides: dict[str, Any] | None = None):
     """アプリ本体を組み立てるファクトリ関数。
@@ -36,6 +53,12 @@ def create_app(config_overrides: dict[str, Any] | None = None):
 
     if config_overrides:
         app.config.update(config_overrides)
+
+    secure_cookies = not (app.config.get("TESTING") or app.config.get("DEBUG"))
+    if not (config_overrides and "SESSION_COOKIE_SECURE" in config_overrides):
+        app.config["SESSION_COOKIE_SECURE"] = secure_cookies
+    if not (config_overrides and "REMEMBER_COOKIE_SECURE" in config_overrides):
+        app.config["REMEMBER_COOKIE_SECURE"] = secure_cookies
 
     # セッション改ざん対策の鍵が無い状態で起動しないための安全装置。
     # 「動くこと」より「安全に動くこと」を優先して明示的に失敗させる。
@@ -85,5 +108,18 @@ def create_app(config_overrides: dict[str, Any] | None = None):
             mimetype="text/html",
             max_age=0,
         )
+
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        return response
 
     return app

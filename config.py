@@ -7,6 +7,16 @@ class Config:
     # SECRET_KEY is required at runtime and injected via environment.
     SECRET_KEY = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SESSION_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+    WTF_CSRF_TIME_LIMIT = 3600
+    PASSWORD_MIN_LENGTH = 8
+    LOGIN_RATE_LIMIT_ATTEMPTS = 5
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60
+    REGISTER_RATE_LIMIT_ATTEMPTS = 3
+    REGISTER_RATE_LIMIT_WINDOW_SECONDS = 300
 
     @staticmethod
     def database_uri() -> str:

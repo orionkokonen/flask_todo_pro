@@ -16,3 +16,21 @@ def test_create_app_requires_secret_key_when_env_missing(monkeypatch):
 
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         create_app({"TESTING": True})
+
+
+def test_create_app_sets_testing_cookie_security_defaults():
+    app = create_app({"TESTING": True, "SECRET_KEY": "test-secret"})
+
+    assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert app.config["REMEMBER_COOKIE_HTTPONLY"] is True
+    assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert app.config["REMEMBER_COOKIE_SAMESITE"] == "Lax"
+    assert app.config["SESSION_COOKIE_SECURE"] is False
+    assert app.config["REMEMBER_COOKIE_SECURE"] is False
+
+
+def test_create_app_sets_secure_cookies_for_non_testing_app():
+    app = create_app({"SECRET_KEY": "test-secret"})
+
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+    assert app.config["REMEMBER_COOKIE_SECURE"] is True
