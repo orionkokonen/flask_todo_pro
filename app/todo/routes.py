@@ -17,6 +17,15 @@ from app.todo import bp
 # ビューごとに同じクエリを書かず、ここに集約することで
 # 「自分のリソースしか見えない」という制御を一元管理する。
 
+
+def _get_or_404(model, object_id: int):
+    """Session.get ベースでモデルを取得し、見つからなければ 404 を返す。"""
+    instance = db.session.get(model, object_id)
+    if instance is None:
+        abort(404)
+    return instance
+
+
 def _accessible_team_ids() -> list[int]:
     """現在のユーザーが所属するチームの ID リストを返す。"""
     return [
@@ -199,7 +208,7 @@ def task_new():
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
-            project = Project.query.get_or_404(form.project_id.data)
+            project = _get_or_404(Project, form.project_id.data)
             # プロジェクト ID を直接指定するため、そのプロジェクトへのアクセス権も確認する
             _ensure_project_access(project)
 
@@ -223,7 +232,7 @@ def task_new():
 @bp.route("/tasks/<int:task_id>", methods=["GET"])
 @login_required
 def task_detail(task_id: int):
-    task = Task.query.get_or_404(task_id)
+    task = _get_or_404(Task, task_id)
     # URL のタスク ID が改ざんされても、アクセス権のないタスクは 403 を返す
     _ensure_task_access(task)
 
@@ -272,7 +281,7 @@ def task_edit(task_id: int):
 
     所有/共有範囲の認可を再確認したうえで更新し、ID改ざんによる越権更新を防ぐ。
     """
-    task = Task.query.get_or_404(task_id)
+    task = _get_or_404(Task, task_id)
     _ensure_task_access(task)
 
     form = TaskForm(obj=task)
@@ -281,7 +290,7 @@ def task_edit(task_id: int):
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
-            project = Project.query.get_or_404(form.project_id.data)
+            project = _get_or_404(Project, form.project_id.data)
             # 編集時も変更先プロジェクトへのアクセス権を再確認する
             _ensure_project_access(project)
 
@@ -309,7 +318,7 @@ def task_edit(task_id: int):
 @login_required
 def task_delete(task_id: int):
     """タスク削除。認可済みリソースのみを削除対象にする。"""
-    task = Task.query.get_or_404(task_id)
+    task = _get_or_404(Task, task_id)
     # 存在確認(404)と権限確認(403)を分離し、監査しやすい失敗理由にする。
     _ensure_task_access(task)
     db.session.delete(task)
@@ -325,7 +334,7 @@ def task_move(task_id: int):
 
     認可違反は 403、不正入力は 400 を返し、問題の種類を明確に分ける。
     """
-    task = Task.query.get_or_404(task_id)
+    task = _get_or_404(Task, task_id)
     _ensure_task_access(task)
 
     new_status = (request.form.get("status") or request.form.get("to") or "").upper()
@@ -348,7 +357,7 @@ def task_set_status(task_id: int):
 @bp.route("/tasks/<int:task_id>/subtasks", methods=["POST"])
 @login_required
 def subtask_add(task_id: int):
-    task = Task.query.get_or_404(task_id)
+    task = _get_or_404(Task, task_id)
     _ensure_task_access(task)
 
     form = SubTaskForm()
@@ -364,7 +373,7 @@ def subtask_add(task_id: int):
 @bp.route("/subtasks/<int:subtask_id>/toggle", methods=["POST"])
 @login_required
 def subtask_toggle(subtask_id: int):
-    st = SubTask.query.get_or_404(subtask_id)
+    st = _get_or_404(SubTask, subtask_id)
     task = st.task
     # サブタスクのアクセス権は親タスクのアクセス権に従う
     _ensure_task_access(task)
@@ -377,7 +386,7 @@ def subtask_toggle(subtask_id: int):
 @bp.route("/subtasks/<int:subtask_id>/delete", methods=["POST"])
 @login_required
 def subtask_delete(subtask_id: int):
-    st = SubTask.query.get_or_404(subtask_id)
+    st = _get_or_404(SubTask, subtask_id)
     task = st.task
     _ensure_task_access(task)
 
@@ -406,7 +415,7 @@ def projects():
         if team_id == 0:
             team = None
         else:
-            team = Team.query.get_or_404(team_id)
+            team = _get_or_404(Team, team_id)
             # フォームに存在しないチーム ID を直接 POST されても、メンバーでなければ拒否する
             if not TeamMember.is_member(current_user.id, team.id):
                 abort(403)
@@ -428,7 +437,7 @@ def projects():
 @bp.route("/projects/<int:project_id>/delete", methods=["POST"])
 @login_required
 def project_delete(project_id: int):
-    p = Project.query.get_or_404(project_id)
+    p = _get_or_404(Project, project_id)
     _ensure_project_access(p)
 
     # 個人プロジェクトは本人のみ削除可能
@@ -484,7 +493,7 @@ def teams():
 @bp.route("/teams/<int:team_id>", methods=["GET", "POST"])
 @login_required
 def team_detail(team_id: int):
-    team = Team.query.get_or_404(team_id)
+    team = _get_or_404(Team, team_id)
 
     # チームメンバーでないユーザーは詳細ページ自体を見せない
     if not TeamMember.is_member(current_user.id, team.id):
@@ -502,6 +511,9 @@ def team_detail(team_id: int):
     )
 
     if form.validate_on_submit():
+        # このアプリでは、招待は共有を始めるための非破壊的な操作なので
+        # 既存メンバーにも許可している。メンバー削除のような影響の大きい
+        # 操作だけを owner に限定する設計。
         username = form.username.data.strip()
         user = User.query.filter_by(username=username).first()
         if not user:
@@ -530,7 +542,7 @@ def team_detail(team_id: int):
 @bp.route("/teams/<int:team_id>/members/<int:user_id>/remove", methods=["POST"])
 @login_required
 def team_member_remove(team_id: int, user_id: int):
-    team = Team.query.get_or_404(team_id)
+    team = _get_or_404(Team, team_id)
 
     # まずリクエスト送信者がチームメンバーかを確認する
     if not TeamMember.is_member(current_user.id, team.id):

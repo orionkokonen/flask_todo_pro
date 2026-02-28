@@ -35,6 +35,8 @@ class RegistrationForm(FlaskForm):
     )
     password = PasswordField(
         "パスワード",
+        # 登録時の最小文字数は、既存のデモ運用・説明との整合を優先して
+        # 当面 min=6 を維持する。
         validators=[DataRequired(), Length(min=6)],
     )
     # EqualTo("password") でパスワード確認フィールドとの一致をバリデーションする

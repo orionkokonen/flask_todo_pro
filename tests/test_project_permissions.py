@@ -1,21 +1,18 @@
+"""プロジェクト削除権限のテスト。
+
+チームプロジェクトの削除が「チームメンバーは 403、チームオーナーは許可」という
+権限モデル通りに動作することを HTTP レベルで確認する。
+"""
 from __future__ import annotations
 
 from app import db
-from app.models import Project, Team, TeamMember, User
+from app.models import Project, Team, TeamMember
 
 
-def _create_user(username: str, password: str) -> User:
-    user = User(username=username)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
-    return user
-
-
-def test_team_project_delete_forbidden_for_member_and_allowed_for_owner(app, client):
+def test_team_project_delete_forbidden_for_member_and_allowed_for_owner(app, client, create_user):
     with app.app_context():
-        owner = _create_user("owner_user", "password123")
-        member = _create_user("member_user", "password123")
+        owner = create_user("owner_user", "password123")
+        member = create_user("member_user", "password123")
 
         team = Team(name="Dev Team", owner_id=owner.id)
         db.session.add(team)
@@ -29,6 +26,7 @@ def test_team_project_delete_forbidden_for_member_and_allowed_for_owner(app, cli
         db.session.commit()
         project_id = project.id
 
+    # --- member は削除できないことを確認 ---
     login_member = client.post(
         "/auth/login",
         data={"username": "member_user", "password": "password123"},
@@ -48,6 +46,7 @@ def test_team_project_delete_forbidden_for_member_and_allowed_for_owner(app, cli
 
     client.get("/auth/logout", follow_redirects=False)
 
+    # --- owner は削除できることを確認 ---
     login_owner = client.post(
         "/auth/login",
         data={"username": "owner_user", "password": "password123"},

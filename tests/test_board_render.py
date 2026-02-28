@@ -1,21 +1,18 @@
+"""ボード表示のテスト。
+
+サブタスクの進捗（完了数/総数）がボード画面に正しく表示されることを確認する。
+テンプレートの変更でサブタスク集計表示が壊れた場合に検知できる回帰テスト。
+"""
 from __future__ import annotations
 
 from app import db
-from app.models import SubTask, Task, User
+from app.models import SubTask, Task
 
 
-def _create_user(username: str, password: str) -> User:
-    user = User(username=username)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
-    return user
+def test_board_renders_subtask_progress(app, client, create_user):
+    user = create_user("board_user", "password123")
 
-
-def test_board_renders_subtask_progress(app, client):
     with app.app_context():
-        user = _create_user("board_user", "password123")
-
         task = Task(
             title="Task with subtasks",
             description="test",

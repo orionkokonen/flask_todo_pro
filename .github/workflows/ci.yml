@@ -1,0 +1,37 @@
+name: CI
+
+# push と pull_request の両方でテストを走らせ、
+# マージ前に問題を検知できるようにする。
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # Render 本番環境と同じ Linux 系を使い、環境差異によるテスト失敗を防ぐ。
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # README に記載した最低保証バージョンでテストし、動作を保証する。
+          python-version: "3.11"
+          # pip キャッシュを有効にして 2 回目以降のインストールを高速化する。
+          cache: "pip"
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        # -q: 出力を簡潔にしてログを読みやすくする。
+        # -p no:cacheprovider: .pytest_cache を使わず常にフル実行し、
+        #   キャッシュによるテスト通過の見逃しを防ぐ。
+        # SECRET_KEY は conftest.py が "test-secret" を渡すため、環境変数設定は不要。
+        run: python -m pytest -q -p no:cacheprovider

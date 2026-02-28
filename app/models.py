@@ -1,11 +1,21 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db, login
+
+
+def utc_now() -> datetime:
+    """UTC の現在時刻を返す。
+
+    まず timezone-aware な UTC 時刻を取得し、その後で既存の
+    DateTime カラム互換のため naive UTC に正規化して保存する。
+    Python 3.12+ の `datetime.utcnow()` 警告を避けるためのヘルパー。
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Team(db.Model):
@@ -16,7 +26,7 @@ class Team(db.Model):
 
     # チームの作成者を管理者として保持する。削除権限などの判定に使う。
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     # cascade="all, delete-orphan" により、チーム削除時にメンバー・プロジェクトも連鎖削除される。
     # lazy="dynamic" でテンプレート側で .count() や .filter_by() を遅延実行できる。
@@ -44,7 +54,7 @@ class TeamMember(db.Model):
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
     role = db.Column(db.String(20), default="member", nullable=False)  # owner / member
-    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    joined_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     team = db.relationship("Team", back_populates="members")
     user = db.relationship("User", back_populates="team_memberships")
@@ -71,7 +81,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     # パスワードはハッシュ化した値のみ保存し、平文は DB に残さない
     password_hash = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     projects = db.relationship("Project", back_populates="owner", lazy="dynamic")
     tasks_created = db.relationship(
@@ -128,7 +138,7 @@ class Project(db.Model):
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     owner = db.relationship("User", back_populates="projects")
     team = db.relationship("Team", back_populates="projects")
@@ -194,9 +204,9 @@ class Task(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=True, index=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
     # onupdate により、編集のたびに自動で更新日時が記録される
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     project = db.relationship("Project", back_populates="tasks")
     created_by = db.relationship("User", back_populates="tasks_created")
@@ -289,7 +299,7 @@ class SubTask(db.Model):
     task_id = db.Column(db.Integer, db.ForeignKey("task.id"), nullable=False, index=True)
     title = db.Column(db.String(160), nullable=False)
     done = db.Column(db.Boolean, default=False, nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     task = db.relationship("Task", back_populates="subtasks")
 

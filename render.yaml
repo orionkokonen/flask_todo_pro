@@ -9,11 +9,15 @@ services:
     startCommand: bash -lc "python -m flask --app wsgi.py db upgrade && gunicorn wsgi:app --bind 0.0.0.0:$PORT"
     envVars:
       - key: SECRET_KEY
+        # Render がデプロイ時にランダムな値を自動生成する。手動設定が不要で、漏洩リスクも下がる。
         generateValue: true
       - key: PYTHONUNBUFFERED
+        # 標準出力をバッファしない設定。ログがリアルタイムで Render ダッシュボードに表示される。
         value: "1"
       - key: DATABASE_URL
         fromDatabase:
+          # Render Blueprint が Web サービスと Postgres を同時に作成し、接続文字列を自動注入する。
+          # アプリ側では DATABASE_URL 環境変数を読むだけでよく、接続先をコードに埋め込まない。
           name: flask-todo-db
           property: connectionString
 
@@ -22,4 +26,6 @@ databases:
     plan: free
     databaseName: flask_todo
     user: flask_todo
+    # ipAllowList を空にすると Render 内部ネットワークからのみ接続を受け付ける。
+    # Web サービスと同一環境内で完結するため、外部 IP 許可は不要。
     ipAllowList: []
