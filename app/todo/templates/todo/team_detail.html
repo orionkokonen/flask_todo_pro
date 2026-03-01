@@ -6,7 +6,7 @@
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
     <h1 class="h4 mb-1"><i class="bi bi-people"></i> {{ team.name }}</h1>
-    <div class="text-secondary small">メンバー：{{ members|length }}人</div>
+    <div class="text-secondary small">メンバー数: {{ members|length }}人</div>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.teams') }}"><i class="bi bi-arrow-left"></i> 一覧へ</a>
@@ -40,12 +40,12 @@
                 </td>
                 <td class="text-end">
                   {% if m.user.id != team.owner_id and current_user.id == team.owner_id %}
-                    <form method="post" action="{{ url_for('todo.team_member_remove', team_id=team.id, user_id=m.user.id) }}" class="d-inline" onsubmit="return confirm('このメンバーを外しますか？');">
+                    <form method="post" action="{{ url_for('todo.team_member_remove', team_id=team.id, user_id=m.user.id) }}" class="d-inline" data-confirm="このメンバーを外しますか？">
                       {{ remove_form.hidden_tag() }}
                       <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-person-dash"></i> 削除</button>
                     </form>
                   {% else %}
-                    <span class="text-secondary small">—</span>
+                    <span class="text-secondary small">-</span>
                   {% endif %}
                 </td>
               </tr>
@@ -67,7 +67,7 @@
             {{ form.username.label(class_='form-label') }}
             {{ form.username(class_='form-control', placeholder='追加したいユーザー名') }}
             {% for e in form.username.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
-            <div class="form-text">ユーザー登録済みのユーザー名を入力してください。</div>
+            <div class="form-text">登録済みのユーザー名を入力してください。</div>
           </div>
           <button class="btn btn-primary" type="submit"><i class="bi bi-person-plus"></i> 追加</button>
         </form>

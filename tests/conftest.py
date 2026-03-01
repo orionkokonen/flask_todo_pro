@@ -22,6 +22,8 @@ from app.security import auth_rate_limiter
 
 @pytest.fixture(autouse=True)
 def clear_rate_limiter():
+    # レート制限はプロセス内で状態を保持するため、テスト間でカウンターが引き継がれてしまう。
+    # autouse=True で全テストに自動適用し、前後で確実にリセットしてテストの独立性を保つ。
     auth_rate_limiter.clear()
     yield
     auth_rate_limiter.clear()
@@ -29,6 +31,13 @@ def clear_rate_limiter():
 
 @pytest.fixture
 def app_factory(tmp_path):
+    """任意の設定を注入できるアプリファクトリ fixture。
+
+    CSRF 有効アプリや本番相当設定（TESTING=False）など、シナリオに応じたアプリを
+    同一テスト内で複数作れるよう、関数を返すファクトリパターンを採用している。
+    tmp_path でテストごとに一意な SQLite DB パスを生成するため、
+    テスト間でデータが混入しない。
+    """
     created_apps = []
 
     def _create_app(overrides: dict[str, Any] | None = None):

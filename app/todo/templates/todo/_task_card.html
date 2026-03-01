@@ -3,11 +3,11 @@
     {% if is_overdue %}
       <span class="badge text-bg-danger" title="期限切れ"><i class="bi bi-exclamation-triangle"></i> {{ task.due_date.strftime('%Y-%m-%d') }}</span>
     {% elif is_today %}
-      <span class="badge text-bg-warning" title="今日が締め切り"><i class="bi bi-alarm"></i> 今日</span>
+      <span class="badge text-bg-warning" title="今日が期限"><i class="bi bi-alarm"></i> 今日</span>
     {% elif is_soon %}
-      <span class="badge text-bg-warning" title="締め切りが近い"><i class="bi bi-alarm"></i> あと{{ days }}日</span>
+      <span class="badge text-bg-warning" title="期限が近い"><i class="bi bi-alarm"></i> あと{{ days }}日</span>
     {% else %}
-      <span class="badge text-bg-secondary" title="締め切り"><i class="bi bi-calendar"></i> あと{{ days }}日</span>
+      <span class="badge text-bg-secondary" title="期限日"><i class="bi bi-calendar"></i> あと{{ days }}日</span>
     {% endif %}
   {% endif %}
 {%- endmacro %}
@@ -33,7 +33,7 @@
             <li><a class="dropdown-item" href="{{ url_for('todo.task_edit', task_id=task.id) }}"><i class="bi bi-pencil"></i> 編集</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
-              <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" onsubmit="return confirm('削除しますか？');">
+              <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除しますか？">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="dropdown-item text-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>
               </form>
@@ -95,7 +95,7 @@
           {% if task.due_date %}
             {{ task.due_date.strftime('%Y-%m-%d') }}
           {% else %}
-            <span class="text-secondary">締切なし</span>
+            <span class="text-secondary">期限なし</span>
           {% endif %}
         </div>
       </div>

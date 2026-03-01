@@ -6,7 +6,7 @@
 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
   <div>
     <h1 class="h4 mb-1">プロジェクト</h1>
-    <div class="text-secondary small">タスクを束ねて管理できます。チームに紐づけると共有プロジェクトになります。</div>
+    <div class="text-secondary small">タスクをまとめて管理できます。チームに紐づけると共有プロジェクトになります。</div>
   </div>
 </div>
 
@@ -41,7 +41,7 @@
                       {% endif %}
                     </td>
                     <td class="text-end">
-                      <form method="post" action="{{ url_for('todo.project_delete', project_id=p.id) }}" class="d-inline" onsubmit="return confirm('削除しますか？（プロジェクト内のタスクも削除されます）')">
+                      <form method="post" action="{{ url_for('todo.project_delete', project_id=p.id) }}" class="d-inline" data-confirm="削除しますか？（プロジェクト内のタスクも削除されます）">
                         {{ delete_form.hidden_tag() }}
                         <button class="btn btn-sm btn-outline-danger" type="submit" title="削除">
                           <i class="bi bi-trash"></i>
@@ -68,7 +68,7 @@
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.name.label(class_='form-label') }}
-            {{ form.name(class_='form-control', placeholder='例：今年を充実させる') }}
+            {{ form.name(class_='form-control', placeholder='例: 開発タスク') }}
             {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="mb-3">

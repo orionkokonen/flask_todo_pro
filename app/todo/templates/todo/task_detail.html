@@ -36,7 +36,10 @@
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.board') }}"><i class="bi bi-arrow-left"></i> 戻る</a>
     <a class="btn btn-outline-primary" href="{{ url_for('todo.task_edit', task_id=task.id) }}"><i class="bi bi-pencil"></i> 編集</a>
-    <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" onsubmit="return confirm('削除します。よろしいですか？');">
+    <!-- data-confirm は app.js が送信前に confirm() ダイアログを出す仕組み。 -->
+    <!-- onsubmit="..." のインライン JS から移行することで CSP の script-src から 'unsafe-inline' を外せた。 -->
+    <!-- hidden_tag() で CSRF トークンを埋め込み、削除が正規のフォーム経由であることを保証する。 -->
+    <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除します。よろしいですか？">
       {{ delete_form.hidden_tag() }}
       <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>
     </form>
@@ -49,7 +52,7 @@
       <div class="card-body">
         <h2 class="h6">メモ</h2>
         {% if task.description %}
-          <p class="mb-0" style="white-space:pre-wrap">{{ task.description }}</p>
+          <p class="mb-0" style="white-space: pre-wrap;">{{ task.description }}</p>
         {% else %}
           <p class="text-secondary mb-0">説明はまだありません。</p>
         {% endif %}
@@ -88,7 +91,7 @@
                       <div class="text-secondary small">{{ st.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
                     </div>
                   </div>
-                  <form method="post" action="{{ url_for('todo.subtask_delete', subtask_id=st.id) }}" onsubmit="return confirm('削除します。よろしいですか？');">
+                  <form method="post" action="{{ url_for('todo.subtask_delete', subtask_id=st.id) }}" data-confirm="削除します。よろしいですか？">
                     {{ delete_form.hidden_tag() }}
                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x"></i></button>
                   </form>
@@ -121,7 +124,7 @@
       <div class="card-body">
         <h2 class="h6">情報</h2>
         <dl class="row mb-0">
-          <dt class="col-4 text-secondary">締め切り</dt>
+          <dt class="col-4 text-secondary">期限日</dt>
           <dd class="col-8">
             {% if task.due_date %}
               {{ task.due_date.strftime('%Y-%m-%d') }}
@@ -144,18 +147,18 @@
 
         <hr>
 
-        <h2 class="h6">状態を動かす</h2>
+        <h2 class="h6">状態を変更</h2>
         <form method="post" action="{{ url_for('todo.task_move', task_id=task.id) }}" class="row g-2">
           {{ move_form.hidden_tag() }}
           <div class="col-8">
             <select name="status" class="form-select">
-              {% for s in ['TODO','DOING','DONE','WISH'] %}
-                <option value="{{ s }}" {% if task.status==s %}selected{% endif %}>{{ s }}</option>
+              {% for s in ['TODO', 'DOING', 'DONE', 'WISH'] %}
+                <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="col-4">
-            <button class="btn btn-outline-secondary w-100" type="submit"><i class="bi bi-arrow-left-right"></i> 変更</button>
+            <button class="btn btn-outline-secondary w-100" type="submit"><i class="bi bi-arrow-left-right"></i> 移動</button>
           </div>
         </form>
       </div>

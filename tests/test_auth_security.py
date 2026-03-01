@@ -1,17 +1,27 @@
 """認証セキュリティのテスト。
 
-Open Redirect 脆弱性（ログイン後に外部 URL へ誘導される攻撃）が
-防がれていることを確認する。
-next パラメータの同一オリジン検証が正しく動作しているかの回帰テスト。
+Open Redirect 脆弱性（ログイン後に外部 URL へ誘導される攻撃）の防御と、
+パスワードポリシー（12文字以上・大文字・小文字・数字を各1文字以上）の回帰テスト。
+next パラメータの同一オリジン検証と、文字種バリデーションがそれぞれ正しく機能しているかを確認する。
 """
 from __future__ import annotations
 
 from app.models import User
 
 
+# パスワードポリシー違反時に返されるエラーメッセージを定数として定義する。
+# テスト内にハードコードせず、将来メッセージが変わっても一箇所の修正で済むようにする。
+PASSWORD_POLICY_MESSAGE = (
+    "パスワードは12文字以上で、英大文字・英小文字・数字をそれぞれ1文字以上含めてください。"
+).encode("utf-8")
+
+
 def test_login_rejects_external_next_redirect(client, create_user):
-    # 攻撃者が next=https://evil.com を埋め込んだリンクを踏ませた場合に、
-    # 外部 URL へのリダイレクトがブロックされ、ボードトップへ戻ることを確認する。
+    """攻撃者が next=https://evil.com を埋め込んだ場合に外部 URL へリダイレクトされないことを確認する。
+
+    Open Redirect 攻撃（フィッシング誘導）のリグレッションテスト。
+    ログイン成功後は必ずボードトップへ退避し、evil.com は Location に含まれてはならない。
+    """
     create_user("alice", "password123")
 
     response = client.post(
@@ -26,8 +36,10 @@ def test_login_rejects_external_next_redirect(client, create_user):
 
 
 def test_login_allows_safe_relative_next_redirect(client, create_user):
-    # 同一オリジンの相対パスは正規の遷移先として許可されることを確認する。
-    # ブロックしすぎて UX が壊れていないかの検証でもある。
+    """同一オリジンの相対パスは正規の遷移先として許可されることを確認する。
+
+    ブロックしすぎて正規ユーザーの UX が壊れていないかの確認。
+    """
     create_user("bob", "password123")
 
     response = client.post(
@@ -41,30 +53,93 @@ def test_login_allows_safe_relative_next_redirect(client, create_user):
 
 
 def test_register_rejects_password_shorter_than_min_length(app, client):
+    """12 文字未満のパスワードで登録が拒否され、DB にユーザーが作られないことを確認する。"""
     response = client.post(
         "/auth/register",
         data={
             "username": "short_pw_user",
-            "password": "1234567",
-            "password2": "1234567",
+            "password": "StrongPas12",
+            "password2": "StrongPas12",
         },
         follow_redirects=False,
     )
 
     assert response.status_code == 200
-    assert "パスワードは8文字以上で入力してください。".encode("utf-8") in response.data
+    assert PASSWORD_POLICY_MESSAGE in response.data
 
     with app.app_context():
         assert User.query.filter_by(username="short_pw_user").first() is None
 
 
+def test_register_rejects_password_without_uppercase(app, client):
+    """英大文字を含まないパスワードで登録が拒否されることを確認する。"""
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "missing_upper_user",
+            "password": "strongpass123",
+            "password2": "strongpass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert PASSWORD_POLICY_MESSAGE in response.data
+
+    with app.app_context():
+        assert User.query.filter_by(username="missing_upper_user").first() is None
+
+
+def test_register_rejects_password_without_lowercase(app, client):
+    """英小文字を含まないパスワードで登録が拒否されることを確認する。"""
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "missing_lower_user",
+            "password": "STRONGPASS123",
+            "password2": "STRONGPASS123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert PASSWORD_POLICY_MESSAGE in response.data
+
+    with app.app_context():
+        assert User.query.filter_by(username="missing_lower_user").first() is None
+
+
+def test_register_rejects_password_without_digit(app, client):
+    """数字を含まないパスワードで登録が拒否されることを確認する。"""
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "missing_digit_user",
+            "password": "StrongPassword",
+            "password2": "StrongPassword",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert PASSWORD_POLICY_MESSAGE in response.data
+
+    with app.app_context():
+        assert User.query.filter_by(username="missing_digit_user").first() is None
+
+
 def test_register_accepts_password_with_min_length(app, client):
+    """全ポリシーを満たすパスワードで登録が成功し、DB にユーザーが正しく保存されることを確認する。
+
+    パスワードはハッシュ化されて保存されるため、check_password() で検証し、
+    平文が保存されていないことも間接的に確認している。
+    """
     response = client.post(
         "/auth/register",
         data={
             "username": "min_length_user",
-            "password": "12345678",
-            "password2": "12345678",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
         },
         follow_redirects=False,
     )
@@ -75,4 +150,4 @@ def test_register_accepts_password_with_min_length(app, client):
     with app.app_context():
         user = User.query.filter_by(username="min_length_user").first()
         assert user is not None
-        assert user.check_password("12345678")
+        assert user.check_password("StrongPass123")

@@ -15,7 +15,7 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, EqualTo, Length, Optional, ValidationError
 
-from app.models import User, Task
+from app.models import Task, User
 
 
 def optional_int(value):
@@ -57,9 +57,48 @@ class RegistrationForm(FlaskForm):
             raise ValidationError("このユーザー名は既に使用されています。")
 
     def validate_password(self, password):
-        min_length = current_app.config.get("PASSWORD_MIN_LENGTH", 8)
-        if len(password.data or "") < min_length:
-            raise ValidationError(f"パスワードは{min_length}文字以上で入力してください。")
+        """パスワード強度をアプリ設定から動的に検証するカスタムバリデータ。
+
+        WTForms の validate_<field名> 命名規則により自動的に実行される。
+        最小文字数・大文字・小文字・数字・記号の各要件は config の PASSWORD_REQUIRE_* を参照し、
+        コードを変えずに設定値だけでポリシーを調整できる設計にしている。
+        エラーメッセージは実際に要求している条件のみを列挙し、過剰な情報を与えない。
+        """
+        password_value = password.data or ""
+        min_length = current_app.config.get("PASSWORD_MIN_LENGTH", 12)
+        require_upper = current_app.config.get("PASSWORD_REQUIRE_UPPER", True)
+        require_lower = current_app.config.get("PASSWORD_REQUIRE_LOWER", True)
+        require_digit = current_app.config.get("PASSWORD_REQUIRE_DIGIT", True)
+        require_symbol = current_app.config.get("PASSWORD_REQUIRE_SYMBOL", False)
+
+        requirements = []
+        if require_upper:
+            requirements.append("英大文字")
+        if require_lower:
+            requirements.append("英小文字")
+        if require_digit:
+            requirements.append("数字")
+        if require_symbol:
+            requirements.append("記号")
+
+        if requirements:
+            policy_message = (
+                f"パスワードは{min_length}文字以上で、"
+                f"{'・'.join(requirements)}をそれぞれ1文字以上含めてください。"
+            )
+        else:
+            policy_message = f"パスワードは{min_length}文字以上で入力してください。"
+
+        is_too_short = len(password_value) < min_length
+        missing_upper = require_upper and not any(char.isupper() for char in password_value)
+        missing_lower = require_lower and not any(char.islower() for char in password_value)
+        missing_digit = require_digit and not any(char.isdigit() for char in password_value)
+        missing_symbol = require_symbol and not any(
+            not char.isalnum() for char in password_value
+        )
+
+        if any((is_too_short, missing_upper, missing_lower, missing_digit, missing_symbol)):
+            raise ValidationError(policy_message)
 
 
 class LoginForm(FlaskForm):
@@ -75,7 +114,7 @@ class TaskForm(FlaskForm):
 
     # ステータスは自由入力ではなく選択式にして、不正な値が混入しないようにする
     status = SelectField(
-        "種別 / 状態",
+        "状態 / 進捗",
         choices=[
             (Task.STATUS_TODO, "やる（ToDo）"),
             (Task.STATUS_DOING, "進行中（Doing）"),
@@ -86,7 +125,7 @@ class TaskForm(FlaskForm):
     )
 
     due_date = DateField(
-        "締め切り",
+        "期限日",
         validators=[Optional()],
         format="%Y-%m-%d",
         description="YYYY-MM-DD",

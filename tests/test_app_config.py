@@ -27,6 +27,9 @@ def test_create_app_sets_testing_cookie_security_defaults():
     assert app.config["REMEMBER_COOKIE_SAMESITE"] == "Lax"
     assert app.config["SESSION_COOKIE_SECURE"] is False
     assert app.config["REMEMBER_COOKIE_SECURE"] is False
+    assert app.config["PASSWORD_MIN_LENGTH"] == 12
+    assert app.config["REMEMBER_COOKIE_DURATION"].days == 30
+    assert app.config["PROXY_FIX_TRUSTED_HOPS"] == 0
 
 
 def test_create_app_sets_secure_cookies_for_non_testing_app():

@@ -1,3 +1,5 @@
+// アプリ全体で使う共通 JS をまとめたモジュール。
+// IIFE（即時実行関数）でスコープを閉じて、グローバル変数の汚染を防ぐ。
 (function(){
   const any = (sel) => document.querySelector(sel);
   const all = (sel) => Array.from(document.querySelectorAll(sel));
@@ -10,9 +12,32 @@
     });
   }
 
+  // data-confirm 属性を持つフォームの送信前に確認ダイアログを表示する。
+  // 以前はテンプレートに onsubmit="return confirm(...)" を直書きしていたが、
+  // CSP の 'unsafe-inline' を script-src から外すためにこちらへ集約した。
+  // フォームに data-confirm="メッセージ" を付けるだけで確認ダイアログを有効化できる。
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const message = form.dataset.confirm;
+    if (message && !window.confirm(message)) {
+      event.preventDefault();
+    }
+  }, true);
+
   // Enable tooltip
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
   tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl)
   });
+
+  // PWA: Service Worker registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.warn('ServiceWorker registration failed:', err);
+      });
+    });
+  }
 })();
