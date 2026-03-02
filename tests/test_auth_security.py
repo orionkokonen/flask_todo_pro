@@ -133,6 +133,8 @@ def test_register_accepts_password_with_min_length(app, client):
 
     パスワードはハッシュ化されて保存されるため、check_password() で検証し、
     平文が保存されていないことも間接的に確認している。
+    また、登録成功後は自動ログインしてボードへリダイレクトされるため、
+    遷移先が /todo/ であることも合わせて検証する。
     """
     response = client.post(
         "/auth/register",
@@ -145,9 +147,45 @@ def test_register_accepts_password_with_min_length(app, client):
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/auth/login")
+    assert response.headers["Location"].endswith("/todo/")
 
     with app.app_context():
         user = User.query.filter_by(username="min_length_user").first()
         assert user is not None
         assert user.check_password("StrongPass123")
+
+
+def test_register_logs_in_user_and_shows_success_flash(client):
+    """登録成功後に自動ログインされ、成功フラッシュメッセージが表示されることを確認する。
+
+    登録直後にユーザーがログイン済みになっているかを、
+    /todo/ へのアクセスが認証なしで 200 を返すことで間接的に検証する。
+    「登録 → ログイン」と 2 ステップ踏まなくてよい UX 設計が
+    正しく機能しているかのリグレッションテスト。
+    """
+    # 登録成功時に表示される期待メッセージを、読みやすいように変数へ切り出す。
+    # この固定文字列と実際のレスポンスを比較することで、文言変更時にテストが失敗して検知できる。
+    success_message = (
+        "\u767b\u9332\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\u3002"
+        "\u30ed\u30b0\u30a4\u30f3\u3057\u307e\u3057\u305f\u3002"
+    )
+
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "new_logged_in_user",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert success_message in response.get_data(as_text=True)
+
+    # 登録後にそのままボードへアクセスできる（ログイン済み）ことを確認する。
+    # ログインしていなければ /auth/login にリダイレクトされ 302 が返るため、
+    # 200 が返ることで「自動ログインが成功した」と判定できる。
+    board_response = client.get("/todo/", follow_redirects=False)
+
+    assert board_response.status_code == 200

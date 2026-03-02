@@ -61,7 +61,7 @@ class SimpleRateLimiter:
         """
         with self._lock:
             now = monotonic()
-            # check() only decides whether the request can proceed.
+            # check() はリクエストを通してよいかを判断するだけで、失敗の記録はしない。
             entries = self._prune(bucket, now, window_seconds)
             if not entries:
                 self._entries.pop(bucket, None)
@@ -82,7 +82,7 @@ class SimpleRateLimiter:
         """
         with self._lock:
             now = monotonic()
-            # record_failure() is called only after a POST attempt actually fails.
+            # record_failure() は POST 試行が実際に失敗したときだけ呼ぶ。
             entries = self._prune(bucket, now, window_seconds)
             if entries is None:
                 entries = self._entries.setdefault(bucket, deque())

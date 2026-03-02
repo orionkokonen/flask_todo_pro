@@ -5,7 +5,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config:
-    # SECRET_KEY is required at runtime and injected via environment.
+    # SECRET_KEY は起動時に必須で、環境変数から注入する。設定ファイルに直書きしてはならない。
     SECRET_KEY = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

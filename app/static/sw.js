@@ -1,6 +1,6 @@
-/* Service Worker for Todo Pro (PWA)
-   - cache-first for static assets
-   - network-first for navigations (HTML)
+/* Service Worker（PWA のオフライン対応）
+   - 静的ファイル: キャッシュ優先（cache-first）で高速表示
+   - 画面遷移（HTML）: ネットワーク優先（network-first）で常に最新を返す
 */
 
 const CACHE_NAME = "todo-pro-v1";

@@ -45,7 +45,7 @@ def _accessible_projects():
     personal = Project.query.filter_by(owner_id=current_user.id, team_id=None)
     team = Project.query.filter(Project.team_id.in_(team_ids)) if team_ids else Project.query.filter(False)
 
-    # union: personal + team
+    # 個人プロジェクトとチームプロジェクトを union でまとめて返す
     return personal.union(team)
 
 
@@ -347,7 +347,7 @@ def task_move(task_id: int):
     return redirect(request.referrer or url_for("todo.board"))
 
 
-# Backward compatibility (unused)
+# 後方互換のために残しているルート（現在は task_move に統合済みで未使用）
 @bp.route("/tasks/<int:task_id>/set_status", methods=["POST"])
 @login_required
 def task_set_status(task_id: int):
@@ -457,8 +457,7 @@ def project_delete(project_id: int):
         )
         abort(403)
 
-    # チームプロジェクトはメンバーなら削除可能（運用によりownerのみにしたければここで制限）
-    # Team projects are restricted to owner-only delete.
+    # チームプロジェクトの削除は owner のみ許可する（上の abort(403) で保証済み）。
     db.session.delete(p)
     db.session.commit()
     flash("プロジェクトを削除しました。")

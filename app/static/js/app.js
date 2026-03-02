@@ -4,7 +4,7 @@
   const any = (sel) => document.querySelector(sel);
   const all = (sel) => Array.from(document.querySelectorAll(sel));
 
-  // Auto-submit filter form on select change
+  // セレクトボックスの値が変わったらフィルターフォームを自動送信する。
   const filterForm = any('#filterForm');
   if (filterForm) {
     all('#filterForm select').forEach(el => {
@@ -26,13 +26,13 @@
     }
   }, true);
 
-  // Enable tooltip
+  // Bootstrap のツールチップ（ホバー時の補足説明）を初期化・有効化する。
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
   tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl)
   });
 
-  // PWA: Service Worker registration
+  // PWA: Service Worker を登録してオフライン対応とキャッシュ戦略を有効にする。
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js').catch(function (err) {
