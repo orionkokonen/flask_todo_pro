@@ -1,8 +1,8 @@
-"""セキュリティヘッダーの動作テスト。
+"""セキュリティヘッダーと静的アセット参照の回帰テスト。
 
 after_request フックで全レスポンスに付与されるヘッダーの存在・値を確認する。
-script-src から 'unsafe-inline' が外れたことを明示的にアサートし、
-CSP の後退（リグレッション）を防ぐ。
+Bootstrap をローカル配信に切り替えたため、CSP が self 中心の構成を維持し、
+テンプレートが CDN ではなく /static/vendor/... を参照していることも検証する。
 テスト設定（TESTING=True）では HSTS を出力せず、
 本番相当設定（TESTING=False / DEBUG=False）では HSTS を返すことも検証する。
 """
@@ -26,13 +26,31 @@ def test_security_headers_are_set_on_responses(client):
 
     csp = response.headers["Content-Security-Policy"]
     assert "default-src 'self'" in csp
-    # script-src は CDN のみ許可し、unsafe-inline は含まない
-    assert "script-src 'self' https://cdn.jsdelivr.net" in csp
-    assert "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'" not in csp
-    # style-src は Bootstrap + カスタム CSS の互換のため unsafe-inline を維持
-    assert "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'" in csp
+    # script-src は self のみ許可し、unsafe-inline は含まない
+    assert "script-src 'self'" in csp
+    assert "script-src 'self' 'unsafe-inline'" not in csp
+    # style-src はインライン style 互換のため unsafe-inline を維持
+    assert "style-src 'self' 'unsafe-inline'" in csp
+    assert "font-src 'self'" in csp
+    assert "cdn.jsdelivr.net" not in csp
     # テスト環境では SESSION_COOKIE_SECURE=False のため HSTS は付与されない
     assert "Strict-Transport-Security" not in response.headers
+
+
+def test_login_page_uses_local_vendor_assets(client):
+    """ログイン画面が CDN ではなくローカル配信の vendor 資産を参照することを確認する。
+
+    外部 CDN の到達性に依存しないようにし、PC / スマホで見た目が崩れにくい構成を
+    テンプレート出力レベルで回帰テストする。
+    """
+    response = client.get("/auth/login")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '/static/vendor/bootstrap/bootstrap.min.css' in html
+    assert '/static/vendor/bootstrap-icons/bootstrap-icons.min.css' in html
+    assert '/static/vendor/bootstrap/bootstrap.bundle.min.js' in html
+    assert 'cdn.jsdelivr.net' not in html
 
 
 def test_login_sets_session_cookie_security_attributes(client, create_user):

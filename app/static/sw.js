@@ -3,14 +3,20 @@
    - 画面遷移（HTML）: ネットワーク優先（network-first）で常に最新を返す
 */
 
-const CACHE_NAME = "todo-pro-v1";
+const CACHE_NAME = "todo-pro-v2";
 
-// “アプリの骨格”だけをプリキャッシュ。CDN は環境によって変わるので入れません。
+// “アプリの骨格”だけをプリキャッシュ。
+// Bootstrap をローカル配信に切り替えたため、UI に必要な vendor 資産も含める。
 const CORE_ASSETS = [
   "/",
   "/offline.html",
   "/static/css/app.css",
   "/static/js/app.js",
+  "/static/vendor/bootstrap/bootstrap.min.css",
+  "/static/vendor/bootstrap/bootstrap.bundle.min.js",
+  "/static/vendor/bootstrap-icons/bootstrap-icons.min.css",
+  "/static/vendor/bootstrap-icons/fonts/bootstrap-icons.woff",
+  "/static/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/maskable-192.png",

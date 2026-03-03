@@ -20,17 +20,17 @@ migrate = Migrate()
 
 login.login_view = "auth.login"
 
-# CDN（Bootstrap / Bootstrap Icons）を許可しつつ、外部からのスクリプト埋め込みを制限する CSP。
+# Bootstrap を静的ファイルとして配信しつつ、外部からのスクリプト埋め込みを制限する CSP。
 # onsubmit 等の inline event handler を app.js の data-confirm パターンに移行したことで、
 # script-src から 'unsafe-inline' を外せるようになり、XSS 経由の任意スクリプト実行リスクを低減した。
-# style-src には 'unsafe-inline' を残しているが、これは Bootstrap のカスタムスタイル互換のため。
+# style-src には 'unsafe-inline' を残しているが、これは base.html のインライン style 互換のため。
 CONTENT_SECURITY_POLICY = "; ".join(
     [
         "default-src 'self'",
-        "script-src 'self' https://cdn.jsdelivr.net",
-        "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data:",
-        "font-src 'self' https://cdn.jsdelivr.net",
+        "font-src 'self'",
         "connect-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
@@ -129,7 +129,7 @@ def create_app(config_overrides: dict[str, Any] | None = None):
     def apply_security_headers(response):
         """全レスポンスにブラウザ側のセキュリティヘッダーを付与する。
 
-        アプリケーション層で設定することで、Nginx / CDN の有無に関わらず
+        アプリケーション層で設定することで、Nginx などの前段構成に関わらず
         一貫したヘッダーを保証できる。各ヘッダーの役割は以下の通り。
         - X-Content-Type-Options: MIME スニッフィングを防ぎ XSS リスクを低減する。
         - X-Frame-Options: クリックジャッキング攻撃（iframe 埋め込み）をブロックする。
