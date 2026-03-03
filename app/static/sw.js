@@ -3,7 +3,8 @@
    - 画面遷移（HTML）: ネットワーク優先（network-first）で常に最新を返す
 */
 
-const CACHE_NAME = "todo-pro-v2";
+// 静的ファイルを更新したら、キャッシュ名も上げて古い資産を入れ替える。
+const CACHE_NAME = "todo-pro-v3";
 
 // “アプリの骨格”だけをプリキャッシュ。
 // Bootstrap をローカル配信に切り替えたため、UI に必要な vendor 資産も含める。
