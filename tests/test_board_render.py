@@ -21,6 +21,7 @@ def test_board_renders_subtask_progress(app, client, create_user):
         )
         db.session.add(task)
         db.session.flush()
+        task_id = task.id
 
         db.session.add(SubTask(task_id=task.id, title="done subtask", done=True))
         db.session.add(SubTask(task_id=task.id, title="todo subtask", done=False))
@@ -36,3 +37,9 @@ def test_board_renders_subtask_progress(app, client, create_user):
     response = client.get("/todo/")
     assert response.status_code == 200
     assert b"1/2" in response.data
+    assert b"js-task-card-link" in response.data
+    assert b'role="link"' in response.data
+    assert f'data-detail-url="/todo/tasks/{task_id}"'.encode() in response.data
+    assert f'href="/todo/tasks/{task_id}"'.encode() in response.data
+    assert b"bi-arrow-right" in response.data
+    assert b"bi-pencil" in response.data

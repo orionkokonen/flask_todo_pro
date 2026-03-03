@@ -14,7 +14,13 @@
 
 {% macro task_card(task, status, left, right) -%}
   {% set due = task.due_badge() %}
-  <div class="card kanban-card shadow-sm">
+  <div
+    class="card kanban-card shadow-sm js-task-card-link"
+    data-detail-url="{{ url_for('todo.task_detail', task_id=task.id) }}"
+    tabindex="0"
+    role="link"
+    aria-label="タスク詳細: {{ task.title }}"
+  >
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-start gap-2">
         <div class="me-1">

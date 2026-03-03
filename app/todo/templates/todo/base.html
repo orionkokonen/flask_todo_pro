@@ -21,6 +21,11 @@
     .kanban-col .col-header { position: sticky; top: 72px; z-index: 5; }
     .task-card { border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
     .task-card:hover { transform: translateY(-1px); transition: .15s ease; }
+    .js-task-card-link { cursor: pointer; }
+    .js-task-card-link:focus-visible {
+      outline: 3px solid rgba(13,110,253,.35);
+      outline-offset: 2px;
+    }
     .badge-soft { background: rgba(13,110,253,.10); color: #0d6efd; }
     .badge-soft-success { background: rgba(25,135,84,.12); color: #198754; }
     .badge-soft-warning { background: rgba(255,193,7,.18); color: #856404; }
