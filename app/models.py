@@ -100,10 +100,13 @@ class User(UserMixin, db.Model):
     def set_password(self, password: str) -> None:
         """受け取ったパスワードをハッシュ化して保存する。
 
-        werkzeug の generate_password_hash は PBKDF2+SHA256 を使用し、
-        ソルトも自動付与されるため、平文やシンプルな MD5/SHA1 に比べて安全。
+        werkzeug の generate_password_hash に method="scrypt" を明示し、
+        ソルト付きハッシュとして保存する。平文やシンプルな MD5/SHA1 に比べて安全。
         """
-        self.password_hash = generate_password_hash(password)
+        # method="scrypt" を明示することで、Werkzeug のバージョンアップでデフォルト値が変わっても
+        # ハッシュ方式が変わらないようにする。scrypt はメモリを多く消費する設計のため、
+        # GPU を使った総当たり（ブルートフォース）攻撃に対しても高い耐性を持つ。
+        self.password_hash = generate_password_hash(password, method="scrypt")
 
     def check_password(self, password: str) -> bool:
         """入力パスワードとハッシュを比較する。

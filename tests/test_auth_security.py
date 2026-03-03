@@ -189,3 +189,30 @@ def test_register_logs_in_user_and_shows_success_flash(client):
     board_response = client.get("/todo/", follow_redirects=False)
 
     assert board_response.status_code == 200
+
+
+def test_register_stores_password_hash_with_scrypt(app, client):
+    """登録時のパスワードハッシュ方式が scrypt で固定されていることを確認する。
+
+    Werkzeug の既定値変更に影響されず、面接でもハッシュ方式を説明できる状態を
+    回帰テストで固定する。
+    """
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "scrypt_user",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        user = User.query.filter_by(username="scrypt_user").first()
+        assert user is not None
+        # Werkzeug は "scrypt:..." / "pbkdf2:sha256:..." のようにプレフィックスでアルゴリズムを識別する。
+        # このテストでプレフィックスを固定することで、将来 Werkzeug のデフォルトが変わったとき
+        # に意図せずハッシュ方式が切り替わるリグレッションをテストで検知できる。
+        assert user.password_hash.startswith("scrypt:")
