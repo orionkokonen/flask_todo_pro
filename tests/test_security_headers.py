@@ -47,9 +47,11 @@ def test_login_page_uses_local_vendor_assets(client):
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    # /static/vendor/... への参照が HTML に含まれることで、ローカル配信への切り替えが完了しているか確認する。
     assert '/static/vendor/bootstrap/bootstrap.min.css' in html
     assert '/static/vendor/bootstrap-icons/bootstrap-icons.min.css' in html
     assert '/static/vendor/bootstrap/bootstrap.bundle.min.js' in html
+    # 誰かが誤って CDN の link タグを追加・戻してしまったときに、このテストが失敗して検知できる。
     assert 'cdn.jsdelivr.net' not in html
 
 

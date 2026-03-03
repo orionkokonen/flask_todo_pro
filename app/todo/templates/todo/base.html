@@ -8,6 +8,9 @@
   <link rel="icon" href="/static/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <title>ToDo Pro{% block title %}{% endblock %}</title>
+  <!-- Bootstrap CSS・アイコンフォントをローカル配信（static/vendor/）から読み込む。 -->
+  <!-- CDN（外部サーバー）への依存をなくすことで、接続環境によって見た目が崩れるリスクを排除し、 -->
+  <!-- CSP の script-src / font-src を 'self' だけに絞り込めるようになった。 -->
   <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
   <style>

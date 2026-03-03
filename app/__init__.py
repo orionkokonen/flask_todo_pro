@@ -20,9 +20,10 @@ migrate = Migrate()
 
 login.login_view = "auth.login"
 
-# Bootstrap を静的ファイルとして配信しつつ、外部からのスクリプト埋め込みを制限する CSP。
+# Bootstrap を static/vendor/ にローカル配信することで、外部 CDN への依存を完全に排除した CSP。
 # onsubmit 等の inline event handler を app.js の data-confirm パターンに移行したことで、
 # script-src から 'unsafe-inline' を外せるようになり、XSS 経由の任意スクリプト実行リスクを低減した。
+# font-src も 'self' だけで済むのは、Bootstrap Icons のフォントもローカルに配置したため。
 # style-src には 'unsafe-inline' を残しているが、これは base.html のインライン style 互換のため。
 CONTENT_SECURITY_POLICY = "; ".join(
     [
