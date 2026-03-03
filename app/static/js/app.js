@@ -89,9 +89,13 @@
   // PWA: Service Worker を登録してオフライン対応とキャッシュ戦略を有効にする。
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js').catch(function (err) {
-        console.warn('ServiceWorker registration failed:', err);
-      });
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+        .then(function (registration) {
+          return registration.update();
+        })
+        .catch(function (err) {
+          console.warn('ServiceWorker registration failed:', err);
+        });
     });
   }
 })();

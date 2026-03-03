@@ -3,8 +3,8 @@
    - 画面遷移（HTML）: ネットワーク優先（network-first）で常に最新を返す
 */
 
-// 静的ファイルを更新したら、キャッシュ名も上げて古い資産を入れ替える。
-const CACHE_NAME = "todo-pro-v3";
+// キャッシュ仕様を変えたら、キャッシュ名も上げて古い資産を入れ替える。
+const CACHE_NAME = "todo-pro-v4";
 
 // “アプリの骨格”だけをプリキャッシュ。
 // Bootstrap をローカル配信に切り替えたため、UI に必要な vendor 資産も含める。
@@ -12,7 +12,7 @@ const CORE_ASSETS = [
   "/",
   "/offline.html",
   "/static/css/app.css",
-  "/static/js/app.js",
+  "/static/js/app.js?v=20260304-2",
   "/static/vendor/bootstrap/bootstrap.min.css",
   "/static/vendor/bootstrap/bootstrap.bundle.min.js",
   "/static/vendor/bootstrap-icons/bootstrap-icons.min.css",
@@ -57,44 +57,69 @@ function isStaticRequest(url) {
   return url.pathname.startsWith("/static/") || url.pathname === "/manifest.webmanifest";
 }
 
+function isMutableStaticRequest(url) {
+  return (
+    url.pathname.startsWith("/static/js/") ||
+    url.pathname.startsWith("/static/css/") ||
+    url.pathname === "/manifest.webmanifest"
+  );
+}
+
+function cacheResponse(request, response) {
+  if (!response || !response.ok) {
+    return response;
+  }
+
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+  return response;
+}
+
+function networkFirst(request, options = {}) {
+  const { ignoreSearch = false, offlineFallback = null } = options;
+
+  return fetch(request)
+    .then((response) => cacheResponse(request, response))
+    .catch(() =>
+      caches.match(request, { ignoreSearch }).then(
+        (cached) => cached || (offlineFallback ? caches.match(offlineFallback) : undefined)
+      )
+    );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 1) HTML（画面遷移）は network-first
-  if (isNavigationRequest(request)) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() =>
-          caches
-            .match(request)
-            .then((cached) => cached || caches.match("/offline.html"))
-        )
-    );
+  // POST などの変更系リクエストはキャッシュ戦略の対象外にする。
+  if (request.method !== "GET") {
     return;
   }
 
-  // 2) 静的ファイルは cache-first
+  // 1) HTML（画面遷移）は network-first
+  if (isNavigationRequest(request)) {
+    event.respondWith(networkFirst(request, { offlineFallback: "/offline.html" }));
+    return;
+  }
+
+  // 2) 自作の JS/CSS/manifest は network-first で更新を優先する。
   if (isStaticRequest(url)) {
+    if (isMutableStaticRequest(url)) {
+      event.respondWith(networkFirst(request, { ignoreSearch: true }));
+      return;
+    }
+
+    // 3) vendor やアイコンなど、更新頻度の低い静的ファイルは cache-first。
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request).then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        });
+        return fetch(request).then((response) => cacheResponse(request, response));
       })
     );
     return;
   }
 
-  // 3) それ以外は基本 network（失敗したらキャッシュがあれば返す）
+  // 4) それ以外は基本 network（失敗したらキャッシュがあれば返す）
   event.respondWith(
     fetch(request).catch(() => caches.match(request))
   );
