@@ -21,7 +21,10 @@
     .kanban-col .col-header { position: sticky; top: 72px; z-index: 5; }
     .task-card { border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
     .task-card:hover { transform: translateY(-1px); transition: .15s ease; }
+    /* cursor: pointer でクリック可能な領域であることをマウスカーソルの見た目で示す。 */
     .js-task-card-link { cursor: pointer; }
+    /* :focus-visible で Tab キーによるフォーカス時だけアウトラインを表示する。 */
+    /* マウスクリック時は出ず、キーボード操作時だけ表示されるのでアクセシビリティと見た目を両立できる。 */
     .js-task-card-link:focus-visible {
       outline: 3px solid rgba(13,110,253,.35);
       outline-offset: 2px;

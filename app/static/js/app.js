@@ -3,7 +3,10 @@
 (function(){
   const any = (sel) => document.querySelector(sel);
   const all = (sel) => Array.from(document.querySelectorAll(sel));
+  // js-task-card-link クラスを持つカード要素をクリック可能領域として扱うためのセレクター。
   const cardLinkSelector = '.js-task-card-link';
+  // カード内にある操作系の子要素（リンク・ボタン・フォーム等）を列挙するセレクター。
+  // これらをクリックしたときはカード遷移を起こさず、元の動作（フォーム送信など）を優先する。
   const interactiveSelector = [
     'a',
     'button',
@@ -17,16 +20,19 @@
   ].join(',');
 
   const getElementTarget = (target) => target instanceof Element ? target : null;
+  // クリックされた要素が js-task-card-link の内側かを判定する。
   const getClickableCard = (target) => {
     const elementTarget = getElementTarget(target);
     if (!elementTarget) return null;
     return elementTarget.closest(cardLinkSelector);
   };
+  // クリックされた要素がリンク・ボタン・フォームなど操作系の要素か判定する。
   const isInteractiveTarget = (target) => {
     const elementTarget = getElementTarget(target);
     if (!elementTarget) return false;
     return Boolean(elementTarget.closest(interactiveSelector));
   };
+  // カードの data-detail-url に保持した URL へブラウザ遷移する。
   const navigateToCard = (card) => {
     if (!(card instanceof HTMLElement)) return;
 
@@ -59,6 +65,8 @@
   }, true);
 
   // カードの余白をクリックしても詳細へ移動できるようにする。
+  // ボタン・リンクなどの操作要素は除外し、修飾キー（Ctrl/Cmd など）付きクリックも除外することで
+  // 「新しいタブで開く」操作などブラウザ標準の挙動を妨げない。
   document.addEventListener('click', (event) => {
     const card = getClickableCard(event.target);
     if (!card || isInteractiveTarget(event.target)) return;
@@ -87,6 +95,8 @@
   });
 
   // PWA: Service Worker を登録してオフライン対応とキャッシュ戦略を有効にする。
+  // updateViaCache: 'none' でブラウザの HTTP キャッシュを無視し、sw.js を常に最新版で取得する。
+  // registration.update() で起動のたびに sw.js 更新を確認し、キャッシュ世代の更新を素早く反映させる。
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })

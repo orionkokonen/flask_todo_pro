@@ -37,9 +37,14 @@ def test_board_renders_subtask_progress(app, client, create_user):
     response = client.get("/todo/")
     assert response.status_code == 200
     assert b"1/2" in response.data
+    # カード全体クリック機能に必要な属性が HTML に出力されているかを確認する。
+    # js-task-card-link と data-detail-url は app.js のクリック処理が依存する仕組みで、
+    # テンプレートから誤って削除・変更されたときに回帰テストとして検知できる。
     assert b"js-task-card-link" in response.data
     assert b'role="link"' in response.data
     assert f'data-detail-url="/todo/tasks/{task_id}"'.encode() in response.data
+    # タイトルの <a> リンクが残っていることも確認する（JS が無効な環境での代替遷移手段）。
     assert f'href="/todo/tasks/{task_id}"'.encode() in response.data
+    # カード内の操作ボタン（左右移動・編集）が引き続き出力されていることを確認する。
     assert b"bi-arrow-right" in response.data
     assert b"bi-pencil" in response.data
