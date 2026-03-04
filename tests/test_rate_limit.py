@@ -91,11 +91,11 @@ def test_successful_login_resets_rate_limit_counter(client, create_user):
 
 
 def test_register_rate_limit_blocks_after_too_many_failures(client):
-    """登録失敗が制限回数（3回）を超えると 429 が返ることを確認する。
+    """登録失敗が制限回数（6回）を超えると 429 が返ることを確認する。
 
     パスワードポリシー違反（7文字・全小文字）で失敗させてカウントを積み上げている。
     """
-    for idx in range(3):
+    for idx in range(6):
         response = client.post(
             "/auth/register",
             data={
@@ -130,7 +130,7 @@ def test_register_rate_limit_ignores_untrusted_forwarded_for_header(app_factory)
     app = app_factory({"PROXY_FIX_TRUSTED_HOPS": 0})
     client = app.test_client()
 
-    for idx in range(3):
+    for idx in range(6):
         response = _post_weak_registration(client, f"spoofed_{idx}", forwarded_for="1.1.1.1")
         assert response.status_code == 200
 
@@ -145,18 +145,18 @@ def test_register_rate_limit_uses_forwarded_for_when_proxy_fix_enabled(app_facto
     """ProxyFix が有効（TRUSTED_HOPS=1）のとき、X-Forwarded-For が IP として使われることを確認する。
 
     異なる IP アドレス（2.2.2.2）からのリクエストは別バケットとして扱われ、ブロックされない。
-    同じ IP（1.1.1.1）からの 4 回目はブロックされることで、IP ごとの独立したカウントを検証する。
+    同じ IP（1.1.1.1）からの 7 回目はブロックされることで、IP ごとの独立したカウントを検証する。
     """
     app = app_factory({"PROXY_FIX_TRUSTED_HOPS": 1})
     client = app.test_client()
 
-    for idx in range(3):
+    for idx in range(6):
         response = _post_weak_registration(client, f"forwarded_{idx}", forwarded_for="1.1.1.1")
         assert response.status_code == 200
 
     # 別の IP からのリクエストは別バケットなので通過するはず
     allowed = _post_weak_registration(client, "forwarded_other_ip", forwarded_for="2.2.2.2")
-    # 同じ IP（1.1.1.1）の 4 回目はブロックされるはず
+    # 同じ IP（1.1.1.1）の 7 回目はブロックされるはず
     blocked = _post_weak_registration(client, "forwarded_blocked", forwarded_for="1.1.1.1")
 
     assert allowed.status_code == 200

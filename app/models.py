@@ -238,11 +238,6 @@ class Task(db.Model):
             return None
         return (self.due_date - date.today()).days
 
-    # --- Template compatibility helpers ---
-    def days_remaining(self) -> int | None:
-        """board.html 互換（締切までの日数。期限切れは負）"""
-        return self.days_left
-
     def due_badge(self, soon_days: int = 3) -> dict:
         """テンプレートから due.days / due.is_overdue 等で参照できる締切メタ情報を返す。
 
@@ -259,19 +254,6 @@ class Task(db.Model):
             "is_soon": 0 < days <= soon_days,
         }
 
-    @property
-    def due_label(self) -> str | None:
-        if not self.due_date:
-            return None
-        d = self.days_left
-        if d is None:
-            return None
-        if d > 0:
-            return f"あと{d}日"
-        if d == 0:
-            return "今日が期限"
-        return f"期限切れ（{abs(d)}日）"
-
     def can_access(self, user: User) -> bool:
         """タスクのアクセス権を判定する。
 
@@ -283,13 +265,6 @@ class Task(db.Model):
         if self.project is None:
             return self.created_by_id == user.id
         return self.project.can_access(user)
-
-    @property
-    def subtask_progress(self) -> tuple[int, int]:
-        """完了サブタスク数と総数のタプルを返す。"""
-        total = self.subtasks.count()
-        done = self.subtasks.filter_by(done=True).count() if total else 0
-        return done, total
 
     def __repr__(self) -> str:
         return f"<Task {self.id} {self.title!r} status={self.status}>"

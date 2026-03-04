@@ -49,13 +49,12 @@ class Config:
     PROXY_FIX_TRUSTED_HOPS = 0
 
     # 認証エンドポイントへのブルートフォース対策のパラメータ。
-    # LOGIN: 60 秒以内に 5 回失敗したら一時ブロック。
-    # REGISTER: 300 秒（5分）以内に 3 回失敗したら一時ブロック。
+    # LOGIN は短時間の連続失敗を強めに抑え、REGISTER は通常の入力ミスを考慮して少し緩めにする。
     # in-memory 実装のためプロセス間は共有されないが、シングルプロセスのポートフォリオ環境には十分。
     LOGIN_RATE_LIMIT_ATTEMPTS = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60
-    REGISTER_RATE_LIMIT_ATTEMPTS = 3
-    REGISTER_RATE_LIMIT_WINDOW_SECONDS = 300
+    REGISTER_RATE_LIMIT_ATTEMPTS = 6
+    REGISTER_RATE_LIMIT_WINDOW_SECONDS = 120
 
     @staticmethod
     def database_uri() -> str:
