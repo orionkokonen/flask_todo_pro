@@ -17,6 +17,8 @@
         <hr>
 
         <form method="post">
+          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込む。 #}
+          {# Flask-WTF がフォーム送信時にトークンを検証し、第三者サイトからの不正送信（CSRF 攻撃）を防ぐ。 #}
           {{ form.hidden_tag() }}
 
           <div class="mb-3">
@@ -59,6 +61,9 @@
 
         {% if task and task.id %}
           <div class="mt-3">
+            {# data-confirm: app.js がフォーム送信前に confirm() ダイアログを出す仕組み（インライン onclick 不要）。 #}
+            {# CSP の script-src から 'unsafe-inline' を外すために、確認処理を JS 側へ集約している。 #}
+            {# delete_form.hidden_tag() で CSRF トークンを埋め込み、削除リクエストが正しいセッション由来かをサーバーが検証できるようにする。 #}
             <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除しますか？">
               {{ delete_form.hidden_tag() }}
               <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>

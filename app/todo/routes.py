@@ -142,6 +142,9 @@ def board():
         for task_id in task_ids
     }
     if task_ids:
+        # タスクごとのサブタスク進捗を一括集計する。
+        # N+1 問題（タスク数分のクエリ発行）を防ぐため、
+        # GROUP BY で 1 クエリにまとめてから Python 側でマッピングする。
         progress_rows = (
             db.session.query(
                 SubTask.task_id,
@@ -357,6 +360,11 @@ def task_set_status(task_id: int):
 @bp.route("/tasks/<int:task_id>/subtasks", methods=["POST"])
 @login_required
 def subtask_add(task_id: int):
+    """指定タスクにサブタスクを追加する。
+
+    親タスクへのアクセス権を確認してから登録するため、
+    URL を直接叩いても他ユーザーのタスクへの追加を防げる。
+    """
     task = _get_or_404(Task, task_id)
     _ensure_task_access(task)
 
@@ -373,6 +381,11 @@ def subtask_add(task_id: int):
 @bp.route("/subtasks/<int:subtask_id>/toggle", methods=["POST"])
 @login_required
 def subtask_toggle(subtask_id: int):
+    """サブタスクの完了状態を切り替える（完了↔未完了）。
+
+    サブタスク単体にはアクセス権を定義していないため、
+    親タスクのアクセス権で代替する設計にしている。
+    """
     st = _get_or_404(SubTask, subtask_id)
     task = st.task
     # サブタスクのアクセス権は親タスクのアクセス権に従う
@@ -386,6 +399,11 @@ def subtask_toggle(subtask_id: int):
 @bp.route("/subtasks/<int:subtask_id>/delete", methods=["POST"])
 @login_required
 def subtask_delete(subtask_id: int):
+    """サブタスクを削除する。
+
+    親タスクのアクセス権で認可を行い、
+    他ユーザーのタスクに属するサブタスクを誤って削除されることを防ぐ。
+    """
     st = _get_or_404(SubTask, subtask_id)
     task = st.task
     _ensure_task_access(task)
@@ -399,6 +417,11 @@ def subtask_delete(subtask_id: int):
 @bp.route("/projects", methods=["GET", "POST"])
 @login_required
 def projects():
+    """プロジェクト一覧の表示と新規作成を同一エンドポイントで扱う。
+
+    GET でリストを返し、POST でバリデーション後に DB 保存する。
+    フォームで選択できるチームも、自分が所属するものだけに絞り権限漏れを防ぐ。
+    """
     # list & create
     form = ProjectForm()
     delete_form = EmptyForm()
@@ -467,6 +490,11 @@ def project_delete(project_id: int):
 @bp.route("/teams", methods=["GET", "POST"])
 @login_required
 def teams():
+    """チーム一覧の表示と新規チームの作成を同一エンドポイントで扱う。
+
+    チーム作成時は作成者を owner ロールで TeamMember に自動追加するため、
+    flush() で team.id を確定させてから TeamMember を登録している。
+    """
     form = TeamForm()
 
     team_ids = _accessible_team_ids()
@@ -541,6 +569,11 @@ def team_detail(team_id: int):
 @bp.route("/teams/<int:team_id>/members/<int:user_id>/remove", methods=["POST"])
 @login_required
 def team_member_remove(team_id: int, user_id: int):
+    """チームからメンバーを削除する（owner のみ実行可能）。
+
+    テンプレート側でも削除ボタンを非表示にしているが、
+    API を直接叩かれた場合に備えてサーバー側でも同じ権限を再確認する二重防衛設計。
+    """
     team = _get_or_404(Team, team_id)
 
     # まずリクエスト送信者がチームメンバーかを確認する

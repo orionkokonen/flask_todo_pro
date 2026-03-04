@@ -49,6 +49,7 @@
       </div>
       <div class="card-body">
         <form method="post">
+          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込み、第三者サイトからの不正なチーム作成を防ぐ。 #}
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.name.label(class_='form-label') }}

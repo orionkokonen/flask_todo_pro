@@ -41,6 +41,11 @@ def _render_auth_template(
 
 
 def _rate_limited_response(template_name: str, form, retry_after: int):
+    """レート制限超過時にユーザーへ警告を表示し 429 レスポンスを返す。
+
+    Retry-After ヘッダーを付与することで、クライアント（自動リトライツール等）に
+    次に試せるまでの待機時間を通知する HTTP 標準の仕組み。
+    """
     flash(
         "\u8a66\u884c\u56de\u6570\u304c\u591a\u3059\u304e\u307e\u3059\u3002"
         "\u5c11\u3057\u6642\u9593\u3092\u7f6e\u3044\u3066\u518d\u8a66\u884c\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
@@ -61,6 +66,9 @@ def register():
     bucket = f"register:{_client_ip()}"
 
     if request.method == "POST":
+        # validate_on_submit() より先に IP ごとの試行回数を確認する。
+        # バリデーション処理を実行する前にブロックすることで、
+        # 大量リクエストによるサーバー負荷も同時に抑制できる。
         allowed, retry_after = auth_rate_limiter.check(
             bucket,
             current_app.config["REGISTER_RATE_LIMIT_ATTEMPTS"],

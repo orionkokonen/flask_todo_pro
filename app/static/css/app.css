@@ -1,8 +1,13 @@
+/* ===== CSS カスタムプロパティ（変数）=====
+   色やサイズを変数にまとめることで、デザインテーマの変更を一箇所で制御できる。 */
 :root{
   --kanban-col-bg: rgba(255,255,255,.85);
   --card-hover: rgba(13,110,253,.07);
 }
 
+/* ===== ボディ・背景 =====
+   radial-gradient を複数重ねてページ全体に柔らかいグラデーション背景を設定する。
+   min-height: 100vh でコンテンツが少ない画面でも背景が途切れない。 */
 body {
   background: radial-gradient(1200px 600px at 10% -10%, rgba(13,110,253,.10), transparent),
               radial-gradient(900px 500px at 90% 0%, rgba(25,135,84,.10), transparent),
@@ -10,10 +15,14 @@ body {
   min-height: 100vh;
 }
 
+/* ===== ナビゲーション ===== */
 .navbar-brand{
   letter-spacing: .3px;
 }
 
+/* ===== カンバン列 =====
+   ボードの各ステータス列（TODO / DOING / DONE / WISH）を
+   半透明の白カードで視覚的に区切る。 */
 .kanban-col{
   background: var(--kanban-col-bg);
   border: 1px solid rgba(0,0,0,.06);
@@ -26,6 +35,9 @@ body {
   margin: 0;
 }
 
+/* ===== タスクカード =====
+   transition でホバー時に微妙に浮き上がるアニメーションを付け、
+   クリックできることをユーザーに視覚的に伝える。 */
 .task-card{
   border: 1px solid rgba(0,0,0,.08);
   border-radius: .9rem;
@@ -37,6 +49,9 @@ body {
   background-color: var(--card-hover);
 }
 
+/* ===== ソフトカラーバッジ =====
+   Bootstrap のデフォルトバッジより彩度を抑えた背景色で、
+   テキスト可読性を保ちつつ柔らかい印象にするユーティリティクラス。 */
 .badge-soft{
   background: rgba(13,110,253,.10);
   color: rgb(13,110,253);
@@ -61,13 +76,16 @@ body {
   border: 1px solid rgba(220,53,69,.22);
 }
 
+/* ===== ユーティリティ ===== */
 .small-muted{ color: rgba(33,37,41,.65); }
 
+/* プログレスバーを細く表示してカード内に収まりよくする。 */
 .progress {
   height: .55rem;
   border-radius: 999px;
 }
 
+/* カードのメタ情報（バッジ・締切日など）を横並びかつ折り返し対応で表示する。 */
 .card-meta{
   display:flex;
   gap:.4rem;
@@ -79,6 +97,8 @@ body {
   border-radius: .75rem;
 }
 
+/* ===== サブタスク一覧アイテム =====
+   各サブタスクを半透明の白カードで区切り、親タスクカードと視覚的に区別しやすくする。 */
 .subtask-item{
   border: 1px solid rgba(0,0,0,.06);
   border-radius: .75rem;
@@ -86,6 +106,7 @@ body {
   background: rgba(255,255,255,.7);
 }
 
+/* ===== テーブル（プロジェクト・チームメンバー一覧）===== */
 .table thead th{
   font-weight: 600;
 }

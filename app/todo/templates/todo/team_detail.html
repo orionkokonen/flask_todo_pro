@@ -39,7 +39,11 @@
                   </div>
                 </td>
                 <td class="text-end">
+                  {# 削除ボタンは、チーム owner にだけ「owner 以外のメンバー行」で表示する（UI 上の制限）。 #}
+                  {# サーバー側でも「実行者が owner」「削除対象が owner ではない」を再確認するため、HTML を直接操作されても不正削除は防げる。 #}
                   {% if m.user.id != team.owner_id and current_user.id == team.owner_id %}
+                    {# data-confirm: app.js が送信前に confirm() ダイアログを出す。 #}
+                    {# remove_form.hidden_tag() で CSRF トークンを埋め込み、削除リクエストが正しいセッション由来かをサーバーが検証できるようにする。 #}
                     <form method="post" action="{{ url_for('todo.team_member_remove', team_id=team.id, user_id=m.user.id) }}" class="d-inline" data-confirm="このメンバーを外しますか？">
                       {{ remove_form.hidden_tag() }}
                       <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-person-dash"></i> 削除</button>
@@ -62,6 +66,7 @@
       <div class="card-body">
         <h2 class="h6 mb-3">メンバーを追加</h2>
         <form method="post" action="{{ url_for('todo.team_detail', team_id=team.id) }}">
+          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込む。 #}
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.username.label(class_='form-label') }}
