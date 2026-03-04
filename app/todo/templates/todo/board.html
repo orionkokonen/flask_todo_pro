@@ -1,4 +1,7 @@
 {% extends 'todo/base.html' %}
+{# _task_card.html からカード描画マクロをインポートする。 #}
+{# task_card マクロにも現在のテンプレートコンテキストを渡す。 #}
+{# url_for() / csrf_token() のために必須ではないが、呼び出し元の変数や文脈もマクロ側で参照できるように with context を明示する。 #}
 {% from 'todo/_task_card.html' import task_card with context %}
 
 {% block title %} - ボード{% endblock %}
@@ -79,6 +82,8 @@
           </div>
           <span class="badge text-bg-secondary">{{ tasks_by_status[st]|length }}</span>
         </div>
+        {# ステータス遷移順（WISH -> TODO -> DOING -> DONE）を定義し、現在ステータスの前後の遷移先を算出する。 #}
+        {# 先頭の WISH では left、末尾の DONE では right が none になり、task_card 側でその方向の移動ボタンを出さない。 #}
         {% set order = ['WISH','TODO','DOING','DONE'] %}
         {% set idx = order.index(st) %}
         {% set left_status = order[idx-1] if idx > 0 else none %}
