@@ -1,7 +1,8 @@
-"""カンバンボード画面のルート。
+"""カンバンボード画面のルート（/todo/）。
 
-フィルタリング（スコープ・プロジェクト・キーワード・完了表示切替）と
-ステータス列への振り分けを担当する。タスクの CRUD 自体は routes_tasks.py が受け持つ。
+タスクを TODO / DOING / DONE / WISH の 4 列に振り分けて一覧表示する。
+フィルタリング（スコープ・プロジェクト・キーワード・完了表示切替）もここで処理する。
+タスクの作成・編集・削除は routes_tasks.py が担当。
 """
 from __future__ import annotations
 
@@ -23,7 +24,14 @@ from app.todo.shared import (
 @bp.route("/", methods=["GET"])
 @login_required
 def board():
-    """ボード画面を表示する。@login_required でログイン（認証）必須にしている。"""
+    """ボード画面を表示する。
+
+    処理の流れ:
+    1. URL のクエリパラメータ（?scope=...&project=...&q=...）からフィルタ条件を取得
+    2. ユーザーがアクセスできるプロジェクト・タスクだけを DB から取得
+    3. ステータスごとに分類してテンプレートへ渡す
+    """
+    # --- 1. フィルタ条件をクエリパラメータから取得 ---
     project_id = request.args.get("project", type=int)
     scope = request.args.get("scope", default="all", type=str)
     q = (request.args.get("q") or "").strip()
@@ -31,8 +39,8 @@ def board():
 
     team_ids = get_accessible_team_ids()
 
-    # selectinload でプロジェクト→チームを一括ロードし、
-    # タスク数分のクエリが発生する N+1 問題を防ぐ。
+    # --- 2. アクセス可能なプロジェクトとタスクを DB から取得 ---
+    # selectinload: 関連テーブル（team）を別クエリで一括ロードし N+1 問題を防ぐ。
     projects = (
         get_accessible_projects_query(team_ids)
         .options(selectinload(Project.team))
@@ -75,12 +83,13 @@ def board():
         Task.updated_at.desc(),
     ).all()
 
-    # サブタスク進捗を一括取得してテンプレートへ渡す（N+1 対策）。
+    # --- 3. ステータスごとに分類してテンプレートへ渡す ---
     task_subtask_progress = load_subtask_progress_map([task.id for task in tasks])
 
     def by_status(status: str):
         return [task for task in tasks if task.status == status]
 
+    # カンバンボードの 4 列分のデータを辞書で作成
     columns = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),

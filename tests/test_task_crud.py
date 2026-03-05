@@ -1,8 +1,9 @@
-"""タスク CRUD 操作の統合テスト。
+"""タスク CRUD（作成・読取・更新・削除）の統合テスト。
 
-HTTP レベルで作成・更新・削除の一連フローを通し、
-レスポンスコードと DB の状態変化を両方確認する。
-不正なステータス値の入力が 400 で弾かれることも合わせて検証する。
+HTTP リクエストを実際に送り、レスポンスコードと DB の状態変化を両方確認する。
+テストの種類:
+- 正常系: 作成→更新→削除の一連フロー、ステータス移動（/move）
+- 異常系: 不正ステータス値の拒否（400）、旧 URL（/set_status）が 404 を返すか
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ def test_task_create_update_delete_via_http(
     create_user,
     login,
 ):
+    """タスクの作成→更新→削除を HTTP 経由で一連実行し、各フェーズで DB が正しく変化するか確認。"""
     create_user("crud_user", "password123")
 
     login_response = login("crud_user", "password123")
@@ -86,13 +88,14 @@ def test_task_create_update_delete_via_http(
         assert db.session.get(Task, task_id) is None
 
 
-def test_task_move_rejects_invalid_status(  # 不正ステータスへの変更を 400 で拒否し、DB が変化しないことも確認する
+def test_task_move_rejects_invalid_status(
     app,
     client,
     create_task,
     create_user,
     login,
 ):
+    """不正なステータス値（"INVALID"）で /move を叩くと 400 になり、DB が変化しないことを確認。"""
     user = create_user("status_user", "password123")
     task = create_task(user, title="Move me")
 
@@ -120,6 +123,7 @@ def test_task_move_updates_status_via_current_route(
     create_user,
     login,
 ):
+    """/move に正しいステータスを POST すると DB が更新されることを確認（正常系）。"""
     user = create_user("move_user", "password123")
     task = create_task(user, title="Move success")
 
@@ -146,6 +150,7 @@ def test_legacy_task_set_status_route_returns_404(
     create_user,
     login,
 ):
+    """旧ルート /set_status は削除済みなので 404 が返ることを確認（回帰テスト）。"""
     user = create_user("legacy_route_user", "password123")
     task = create_task(user, title="Legacy route")
 

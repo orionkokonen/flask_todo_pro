@@ -1,9 +1,8 @@
 from flask import Blueprint
 
-# Blueprint（ルーティングのグループ）を定義し、後からルートをインポートする。
-# routes_* を先頭でインポートすると bp がまだ未定義で循環インポートになるため、
-# bp 定義の後にインポートするのが Flask Blueprint の慣例パターン。
-# 責務ごとにファイルを分割（board/tasks/projects/teams）し、1 ファイルの肥大化を防いでいる。
+# Blueprint（URL ルーティングをグループ化する Flask の仕組み）を定義。
+# bp 定義より前に routes_* をインポートすると bp が未定義で循環エラーになるため、
+# 定義後にインポートする。責務ごとにファイル分割して 1 ファイルの肥大化を防いでいる。
 bp = Blueprint("todo", __name__, template_folder="templates")
 
 from app.todo import routes_board, routes_projects, routes_tasks, routes_teams  # noqa: E402,F401

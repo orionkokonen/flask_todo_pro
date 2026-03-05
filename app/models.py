@@ -1,3 +1,8 @@
+"""DB モデル定義（User / Team / Project / Task / SubTask）。
+
+各モデルに can_access() を持たせ、アクセス権チェック（認可）をモデル層に集約している。
+テーブル間の関連は SQLAlchemy の relationship() で定義し、Python オブジェクトとして辿れる。
+"""
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -9,11 +14,10 @@ from app import db, login
 
 
 def utc_now() -> datetime:
-    """UTC の現在時刻を返す。
+    """UTC（世界標準時）の現在時刻を返す。
 
-    まず timezone-aware な UTC 時刻を取得し、その後で既存の
-    DateTime カラム互換のため naive UTC に正規化して保存する。
-    Python 3.12+ の `datetime.utcnow()` 警告を避けるためのヘルパー。
+    Python 3.12 で datetime.utcnow() が非推奨になったため、
+    now(utc) で取得してタイムゾーン情報を外す（DB カラムとの互換性のため）。
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -28,8 +32,8 @@ class Team(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
-    # cascade="all, delete-orphan" により、チーム削除時にメンバー・プロジェクトも連鎖削除される。
-    # lazy="dynamic" でテンプレート側で .count() や .filter_by() を遅延実行できる。
+    # cascade: チーム削除時にメンバー・プロジェクトも自動で連鎖削除する。
+    # lazy="dynamic": 全件ロードせず .count() や .filter() をクエリとして実行できる。
     members = db.relationship(
         "TeamMember",
         back_populates="team",
@@ -103,9 +107,8 @@ class User(UserMixin, db.Model):
         werkzeug の generate_password_hash に method="scrypt" を明示し、
         ソルト付きハッシュとして保存する。平文やシンプルな MD5/SHA1 に比べて安全。
         """
-        # method="scrypt" を明示することで、Werkzeug のバージョンアップでデフォルト値が変わっても
-        # ハッシュ方式が変わらないようにする。scrypt はメモリを多く消費する設計のため、
-        # GPU を使った総当たり（ブルートフォース）攻撃に対しても高い耐性を持つ。
+        # scrypt を明示してバージョンアップでハッシュ方式が変わるのを防ぐ。
+        # scrypt はメモリ消費が大きい設計で、GPU 総当たり攻撃にも高い耐性を持つ。
         self.password_hash = generate_password_hash(password, method="scrypt")
 
     def check_password(self, password: str) -> bool:
@@ -214,8 +217,8 @@ class Task(db.Model):
     project = db.relationship("Project", back_populates="tasks")
     created_by = db.relationship("User", back_populates="tasks_created")
 
-    # テンプレートで .count() / .filter_by() を使うため dynamic にしている。
-    # select ロードにすると全サブタスクを一括取得してしまい、集計が非効率になる。
+    # lazy="dynamic": サブタスクを全件ロードせず、.count() や .filter() で
+    # 必要なデータだけ DB から取得できる（一覧画面でのパフォーマンス対策）。
     subtasks = db.relationship(
         "SubTask",
         back_populates="task",

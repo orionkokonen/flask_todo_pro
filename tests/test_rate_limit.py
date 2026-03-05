@@ -1,18 +1,19 @@
-"""レート制限の動作テスト。
+"""レート制限（ブルートフォース対策）の動作テスト。
 
-認証系エンドポイントへの短時間連続試行がブロックされること、
-成功ログインでカウンターがリセットされることを回帰的に確認する。
-加えて、ProxyFix の有効・無効による X-Forwarded-For の扱いの違いも検証する。
-レート制限は in-memory のため、autouse fixture が各テスト前後でリセットしている。
+検証ポイント:
+- ログイン / 登録の失敗が制限回数を超えると 429（Too Many Requests）が返る
+- ログイン成功でカウンターがリセットされる（正規ユーザーがロックアウトされない）
+- ProxyFix 無効時は X-Forwarded-For を無視し、有効時は IP 別にカウントする
+レート制限はメモリ内管理で、conftest.py の autouse fixture が毎テストごとにリセットする。
 """
 from __future__ import annotations
 
 
 def _post_weak_registration(client, username: str, forwarded_for: str | None = None):
-    """パスワードポリシー違反のリクエストをヘルパーとして送る。
+    """わざとパスワードポリシー違反の登録リクエストを送るヘルパー。
 
-    X-Forwarded-For ヘッダーを任意で付与できるようにしており、
-    ProxyFix の挙動（ヘッダーを信用するか無視するか）を切り替えるテストで使う。
+    forwarded_for を指定すると X-Forwarded-For ヘッダーが付き、
+    ProxyFix が IP をどう扱うかのテストに使える。
     """
     headers = {}
     if forwarded_for is not None:
@@ -31,10 +32,9 @@ def _post_weak_registration(client, username: str, forwarded_for: str | None = N
 
 
 def test_login_rate_limit_blocks_after_too_many_failures(client, create_user):
-    """ログイン失敗が制限回数（5回）を超えると 429 が返り、Retry-After ヘッダーが付くことを確認する。
+    """ログイン失敗が 5 回を超えると 429 になり、Retry-After ヘッダーが付くことを確認。
 
-    6 回目で初めてブロックされること（5 回までは通過すること）も検証し、
-    設定値の境界が正しく機能しているかをアサートする。
+    境界値テスト: 5 回目まで 200、6 回目で 429 → 設定値どおり動いているか検証。
     """
     create_user("limited_user", "password123")
 
@@ -57,10 +57,9 @@ def test_login_rate_limit_blocks_after_too_many_failures(client, create_user):
 
 
 def test_successful_login_resets_rate_limit_counter(client, create_user):
-    """ログイン成功後にカウンターがリセットされ、再び失敗を規定回数まで受け付けることを確認する。
+    """ログイン成功後にカウンターがリセットされ、再び 5 回まで失敗できることを確認。
 
-    成功後もカウントが残ったままだと、正規ユーザーが過去の失敗分でロックアウトされる
-    誤検知が起きる。リセット動作は UX に直結するため重要な回帰テスト対象。
+    リセットしないと正規ユーザーが過去の失敗分でロックされてしまう（誤ブロック）。
     """
     create_user("reset_user", "password123")
 
@@ -91,9 +90,9 @@ def test_successful_login_resets_rate_limit_counter(client, create_user):
 
 
 def test_register_rate_limit_blocks_after_too_many_failures(client):
-    """登録失敗が制限回数（6回）を超えると 429 が返ることを確認する。
+    """登録失敗が 6 回を超えると 429 が返ることを確認。
 
-    パスワードポリシー違反（7文字・全小文字）で失敗させてカウントを積み上げている。
+    パスワードポリシー違反（7 文字・全小文字）でわざと失敗させてカウントを積み上げる。
     """
     for idx in range(6):
         response = client.post(
@@ -122,10 +121,10 @@ def test_register_rate_limit_blocks_after_too_many_failures(client):
 
 
 def test_register_rate_limit_ignores_untrusted_forwarded_for_header(app_factory):
-    """ProxyFix が無効（TRUSTED_HOPS=0）のとき、X-Forwarded-For を信用しないことを確認する。
+    """ProxyFix 無効時は X-Forwarded-For ヘッダーを無視することを確認。
 
-    クライアントが X-Forwarded-For を偽装して別の IP に見せかけてもカウントが同じバケットに
-    積まれ、ブロックが正常に機能することをアサートする（IP 偽装によるレート制限回避の防止）。
+    攻撃者が IP を偽装（1.1.1.1 → 2.2.2.2）しても同じバケットにカウントされ、
+    レート制限を回避できないことを検証する。
     """
     app = app_factory({"PROXY_FIX_TRUSTED_HOPS": 0})
     client = app.test_client()
@@ -142,10 +141,9 @@ def test_register_rate_limit_ignores_untrusted_forwarded_for_header(app_factory)
 
 
 def test_register_rate_limit_uses_forwarded_for_when_proxy_fix_enabled(app_factory):
-    """ProxyFix が有効（TRUSTED_HOPS=1）のとき、X-Forwarded-For が IP として使われることを確認する。
+    """ProxyFix 有効時は X-Forwarded-For の IP ごとに独立してカウントされることを確認。
 
-    異なる IP アドレス（2.2.2.2）からのリクエストは別バケットとして扱われ、ブロックされない。
-    同じ IP（1.1.1.1）からの 7 回目はブロックされることで、IP ごとの独立したカウントを検証する。
+    1.1.1.1 で 6 回失敗 → 2.2.2.2 は別カウントなので通過、1.1.1.1 の 7 回目はブロック。
     """
     app = app_factory({"PROXY_FIX_TRUSTED_HOPS": 1})
     client = app.test_client()

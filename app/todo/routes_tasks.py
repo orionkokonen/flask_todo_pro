@@ -1,8 +1,8 @@
-"""タスク・サブタスクの CRUD ルート。
+"""タスク・サブタスクの CRUD（作成・読取・更新・削除）ルート。
 
-タスクの新規作成・詳細表示・編集・削除・ステータス移動と、
-サブタスクの追加・完了切替・削除を担当する。
-各操作は @login_required と ensure_task_access で「誰でも操作できる」状態を防いでいる。
+全操作に共通する安全策:
+- @login_required  → 未ログインユーザーはログイン画面へリダイレクト（認証）
+- ensure_task_access → 他人のタスクは 403 Forbidden で拒否（認可＝権限チェック）
 """
 from __future__ import annotations
 
@@ -26,15 +26,22 @@ from app.todo.shared import (
 @bp.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def task_new():
-    """タスク新規作成。"""
+    """タスク新規作成。
+
+    GET: 空のフォームを表示（?status=WISH のようにデフォルト値を URL で指定可能）。
+    POST: バリデーション（入力チェック）通過後に DB 保存してボードへリダイレクト。
+    """
     form = TaskForm()
     team_ids = get_accessible_team_ids()
+    # プルダウンの選択肢を動的に設定（アクセスできるプロジェクトのみ表示）
     form.project_id.choices = [("", "— プロジェクトなし —")] + build_project_choices(team_ids)
 
+    # URL の ?status=WISH 等でフォーム初期値をプリセットする（ボードの列から「+」した場合）
     preset_status = (request.args.get("status") or "").upper()
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
 
+    # validate_on_submit(): POST かつ全入力チェック OK のときだけ True
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
@@ -68,6 +75,7 @@ def task_new():
 @bp.route("/tasks/<int:task_id>", methods=["GET"])
 @login_required
 def task_detail(task_id: int):
+    """タスク詳細画面。サブタスク一覧と進捗バー、ステータス変更フォームを表示する。"""
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
@@ -93,10 +101,11 @@ def task_detail(task_id: int):
 @bp.route("/tasks/<int:task_id>/edit", methods=["GET", "POST"])
 @login_required
 def task_edit(task_id: int):
-    """タスク編集。"""
+    """タスク編集。GET でフォームに既存値を表示、POST で更新する。"""
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
+    # obj=task: 既存のタスクの値をフォームの初期値に自動セットする
     form = TaskForm(obj=task)
     team_ids = get_accessible_team_ids()
     form.project_id.choices = [("", "— プロジェクトなし —")] + build_project_choices(team_ids)
@@ -145,9 +154,10 @@ def task_move(task_id: int):
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
+    # フォームから送られたステータス値を取得（"status" か "to" キー）
     new_status = (request.form.get("status") or request.form.get("to") or "").upper()
-    # VALID_STATUSES に含まれない値は 400 で拒否する。
-    # フォームの選択肢を直接改ざんして不正なステータスを送れないよう、サーバー側でも検証する。
+    # ブラウザの開発者ツール等でフォーム値を改ざんされても不正な値を受け付けないよう、
+    # VALID_STATUSES（許可リスト）でサーバー側検証する。
     if new_status not in Task.VALID_STATUSES:
         abort(400)
 

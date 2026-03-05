@@ -1,3 +1,5 @@
+{# タスク詳細画面: メモ・サブタスク一覧（左）と 期限/ステータス変更（右）の 2 カラム構成。 #}
+{# routes_tasks.py の task_detail() から呼ばれ、task / subtasks / progress / meta を受け取る。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - タスク詳細{% endblock %}
@@ -36,9 +38,8 @@
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.board') }}"><i class="bi bi-arrow-left"></i> 戻る</a>
     <a class="btn btn-outline-primary" href="{{ url_for('todo.task_edit', task_id=task.id) }}"><i class="bi bi-pencil"></i> 編集</a>
-    <!-- data-confirm は app.js が送信前に confirm() ダイアログを出す仕組み。 -->
-    <!-- onsubmit="..." のインライン JS から移行することで CSP の script-src から 'unsafe-inline' を外せた。 -->
-    <!-- hidden_tag() で CSRF トークンを埋め込み、削除が正規のフォーム経由であることを保証する。 -->
+    <!-- data-confirm: app.js が送信前に確認ダイアログを出す（インライン JS 不要で CSP 安全）。 -->
+    <!-- hidden_tag(): CSRF トークンを隠しフィールドに埋め込み、正規フォーム経由か検証する。 -->
     <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除します。よろしいですか？">
       {{ delete_form.hidden_tag() }}
       <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>
@@ -72,6 +73,7 @@
           </div>
         {% endif %}
 
+        {# subtasks リスト: routes_tasks.py で事前取得した一覧を使う #}
         <div class="mt-3">
           {% if not subtasks %}
             <p class="text-secondary">サブタスクはまだありません。</p>
@@ -147,6 +149,7 @@
 
         <hr>
 
+        {# ステータス変更フォーム: routes_tasks.py の task_move() へ POST する #}
         <h2 class="h6">状態を変更</h2>
         <form method="post" action="{{ url_for('todo.task_move', task_id=task.id) }}" class="row g-2">
           {{ move_form.hidden_tag() }}

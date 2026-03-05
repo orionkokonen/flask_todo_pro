@@ -1,7 +1,8 @@
-"""プロジェクトの一覧表示・新規作成・削除ルート。
+"""プロジェクトの一覧表示・新規作成・削除ルート（/todo/projects）。
 
-個人プロジェクトとチームプロジェクトを 1 つのモデルで管理し、
-削除権限はプロジェクト種別（個人 or チーム）ごとに 2 段階でチェックする。
+個人プロジェクト（team_id=None）とチームプロジェクト（team_id あり）を
+同じ Project モデルで管理し、削除権限は 2 段階でチェックする:
+  ① アクセスできるか（メンバーか）  ② 削除できるか（オーナーか）
 """
 from __future__ import annotations
 
@@ -23,9 +24,9 @@ from app.todo.shared import (
 @bp.route("/projects", methods=["GET", "POST"])
 @login_required
 def projects():
-    """プロジェクト一覧の表示と新規作成を同一エンドポイントで扱う。"""
+    """プロジェクト一覧の表示（GET）と新規作成（POST）を同一 URL で扱う。"""
     form = ProjectForm()
-    delete_form = EmptyForm()
+    delete_form = EmptyForm()  # 各プロジェクト横の削除ボタン用 CSRF トークン
 
     team_ids = get_accessible_team_ids()
     teams = (
@@ -69,15 +70,16 @@ def projects():
 @bp.route("/projects/<int:project_id>/delete", methods=["POST"])
 @login_required
 def project_delete(project_id: int):
-    """プロジェクトを削除する。削除権限は 2 段階でチェックする。
+    """プロジェクトを削除する。削除権限を 2 段階でチェックする。
 
-    ①まず ensure_project_access でそのプロジェクトを「読める」かを確認（メンバー以外を弾く）。
-    ②次にプロジェクトの種別ごとに「削除できる」かを確認する。
-    個人プロジェクトは所有者のみ、チームプロジェクトはチームオーナーのみ削除できる。
+    ① ensure_project_access → 閲覧権限があるか（メンバー以外を 403 で弾く）
+    ② 種別ごとの削除権限 → 個人:所有者のみ、チーム:チームオーナーのみ
     """
     project = get_or_404(Project, project_id)
+    # ① 閲覧権限チェック
     ensure_project_access(project)
 
+    # ② 削除権限チェック（閲覧できても削除できるとは限らない）
     if project.is_personal and project.owner_id != current_user.id:
         current_app.logger.warning(
             "project delete forbidden: user_id=%s project_id=%s reason=not_personal_owner",

@@ -24,3 +24,27 @@
 ### Docs
 
 - 更新内容の記録場所として `CHANGELOG.md` を追加し、README に変更履歴を積み上げない構成に変更。
+
+## [2026-03-05]
+
+### Changed
+
+- `config.py` の登録レート制限を緩和し、`REGISTER_RATE_LIMIT_ATTEMPTS=6` / `REGISTER_RATE_LIMIT_WINDOW_SECONDS=120` に変更。
+- `app/todo/__init__.py` の import を更新し、`routes_board` / `routes_tasks` / `routes_projects` / `routes_teams` を読み込む構成に変更。
+- `app/todo/templates/todo/task_detail.html` で、サブタスク未登録判定を `task.subtasks.count()` から `not subtasks` に変更。
+- 同テンプレートで、締切表示参照を `meta.days_remaining` から `meta.days` に変更。
+- `tests/test_rate_limit.py` を新しい登録レート制限仕様に合わせて更新（3回→6回、4回目ブロック→7回目ブロック）。
+
+### Removed
+
+- `app/models.py` から未使用ヘルパー `days_remaining` / `due_label` / `subtask_progress` を削除。
+- `app/todo/routes.py` を削除（旧 `/set_status` ルートを含む）。
+
+### Added
+
+- `app/todo/shared.py` を新規追加し、アクセス制御・プロジェクト選択肢構築・進捗集計の共通処理を集約。
+- `app/todo/routes_board.py` を新規追加（ボード表示ロジックを分離）。
+- `app/todo/routes_tasks.py` を新規追加（タスク/サブタスク CRUD と `move` を分離）。
+- `app/todo/routes_projects.py` を新規追加（プロジェクト作成/削除を分離）。
+- `app/todo/routes_teams.py` を新規追加（チーム作成/詳細/メンバー管理を分離）。
+- `tests/test_task_crud.py` にテストを2件追加（`/move` 正常系、旧 `/set_status` が 404 を返すこと）。

@@ -1,7 +1,8 @@
-"""todo Blueprint 内の複数ルートで共通利用するヘルパー群。
+"""todo Blueprint の共通ヘルパー群。
 
-アクセス制御・クエリ構築・進捗集計など、責務の異なるルートファイルが
-重複して書きがちな処理をここに集約し、変更箇所が一箇所に収まるようにしている。
+routes_board / routes_tasks / routes_projects / routes_teams が
+重複しがちな処理（権限チェック・クエリ組立・進捗集計）をここに集約し、
+修正が 1 箇所で済むようにしている。
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from app.models import Project, SubTask, Task, TeamMember
 
 
 def get_or_404(model, object_id: int):
-    """Session.get ベースでモデルを取得し、見つからなければ 404 を返す。"""
+    """主キーでレコードを取得し、見つからなければ 404（ページが無い）を返す。"""
     instance = db.session.get(model, object_id)
     if instance is None:
         abort(404)
@@ -22,11 +23,9 @@ def get_or_404(model, object_id: int):
 
 
 def get_accessible_team_ids() -> list[int]:
-    """現在のユーザーが所属するチームの ID リストを返す。
+    """現在ログイン中のユーザーが所属するチーム ID のリストを返す。
 
-    TeamMember テーブルを参照することで、チームへの所属有無を動的に判定する。
-    プロジェクト・タスクのフィルタリング条件に使い、他チームのデータが
-    混入しないようアクセス範囲を絞る起点になる。
+    このリストをフィルタ条件に使い、他チームのデータが見えないようにする。
     """
     return [
         tm.team_id
@@ -35,11 +34,11 @@ def get_accessible_team_ids() -> list[int]:
 
 
 def get_accessible_projects_query(team_ids: list[int] | None = None):
-    """現在のユーザーがアクセスできる全プロジェクトのクエリを返す。
+    """ユーザーがアクセスできる全プロジェクトのクエリを返す。
 
-    個人プロジェクト（owner が自分 & team_id=None）と
-    チームプロジェクト（team_id が自分の所属チームのいずれか）を
-    union して一本化することで、ボードやプロジェクト一覧を 1 クエリで取得できる。
+    個人プロジェクト（自分が owner で team_id=None）と
+    チームプロジェクト（自分が所属するチームの team_id を持つ）を
+    union（結合）して 1 つのクエリにまとめている。
     """
     if team_ids is None:
         team_ids = get_accessible_team_ids()
@@ -114,11 +113,10 @@ def build_progress_summary(total: int, done: int) -> dict[str, int]:
 
 
 def load_subtask_progress_map(task_ids: list[int]) -> dict[int, dict[str, int]]:
-    """複数タスク分のサブタスク進捗をまとめて取得する。
+    """複数タスク分のサブタスク進捗をまとめて 1 クエリで取得する。
 
-    タスクごとに個別クエリを発行する（N+1 問題）のではなく、
-    task_id IN (...) で一括 GROUP BY 集計することで DB への往復を 1 回に抑える。
-    ボード画面など多数のタスクを同時表示するときにとくに効果がある。
+    タスクごとに DB へ問い合わせると N+1 問題（タスク数だけクエリが飛ぶ）が起きる。
+    ここでは task_id IN (...) + GROUP BY で一括集計し、DB 往復を 1 回に抑えている。
     """
     progress_by_task_id = {
         task_id: build_progress_summary(0, 0)
@@ -127,8 +125,9 @@ def load_subtask_progress_map(task_ids: list[int]) -> dict[int, dict[str, int]]:
     if not task_ids:
         return progress_by_task_id
 
-    # task_id ごとに合計数と完了数を集計する。
-    # coalesce で SUM が NULL になるケース（完了サブタスクが 0 件）を 0 に変換する。
+    # SQL の GROUP BY で task_id ごとにサブタスクの合計数・完了数を集計する。
+    # coalesce: SUM が NULL（完了 0 件）のとき 0 に置き換える SQL 関数。
+    # case: 条件分岐（done=True なら 1、それ以外は 0）を SQL 内で行う。
     progress_rows = (
         db.session.query(
             SubTask.task_id,
