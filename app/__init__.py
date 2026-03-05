@@ -1,3 +1,9 @@
+# ============================================================
+# app/__init__.py — アプリのファクトリ（組み立て工場）
+#
+# Flask アプリ本体と、DB・認証・CSRF保護などの拡張機能を
+# ここで一括セットアップする。全体の起点になるファイル。
+# ============================================================
 from __future__ import annotations
 
 import os
@@ -12,33 +18,36 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 
+# --- Flask 拡張機能のインスタンスをモジュールレベルで作る ---
+# create_app() の中で init_app() して app と紐づける（Flask のお決まりパターン）。
+db = SQLAlchemy()          # DB操作（SQLAlchemy ORM）
+login = LoginManager()     # ログイン状態の管理
+csrf = CSRFProtect()       # CSRF トークン検証
+migrate = Migrate()        # DBマイグレーション（テーブル変更の履歴管理）
 
-db = SQLAlchemy()
-login = LoginManager()
-csrf = CSRFProtect()
-migrate = Migrate()
-
+# 未ログインで保護ページにアクセスしたとき、ここで指定した画面にリダイレクトする。
 login.login_view = "auth.login"
 
-# Bootstrap を static/vendor/ にローカル配信することで、外部 CDN への依存を完全に排除した CSP。
-# onsubmit 等の inline event handler を app.js の data-confirm パターンに移行したことで、
-# script-src から 'unsafe-inline' を外せるようになり、XSS 経由の任意スクリプト実行リスクを低減した。
-# font-src も 'self' だけで済むのは、Bootstrap Icons のフォントもローカルに配置したため。
-# style-src には 'unsafe-inline' を残しているが、これは base.html のインライン style 互換のため。
+# --- CSP（Content Security Policy＝読み込み元の許可リスト） ---
+# ブラウザに「このサイトで読んでいいリソースの出所」を教える仕組み。
+# Bootstrap / アイコンフォントを static/vendor/ にローカル配信したので、
+# 全て 'self'（=自分のドメインだけ）に絞れている。
+# script-src に 'unsafe-inline' がないのは、インライン JS を app.js へ移行したため。
+# style-src の 'unsafe-inline' は base.html のインライン style 用に残してある。
 CONTENT_SECURITY_POLICY = "; ".join(
     [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        "frame-ancestors 'none'",
-        "manifest-src 'self'",
-        "worker-src 'self'",
+        "default-src 'self'",        # 指定がないものは自ドメインのみ許可
+        "script-src 'self'",         # JS は自ドメインのみ（XSS 対策の要）
+        "style-src 'self' 'unsafe-inline'",  # CSS は自ドメイン＋インライン style
+        "img-src 'self' data:",      # 画像は自ドメイン＋data URI
+        "font-src 'self'",           # フォントは自ドメインのみ
+        "connect-src 'self'",        # fetch/XHR は自ドメインのみ
+        "object-src 'none'",         # Flash 等のプラグインは全面禁止
+        "base-uri 'self'",           # <base> タグの悪用を防止
+        "form-action 'self'",        # フォーム送信先は自ドメインのみ
+        "frame-ancestors 'none'",    # iframe での埋め込みを禁止
+        "manifest-src 'self'",       # PWA マニフェストは自ドメインのみ
+        "worker-src 'self'",         # Service Worker は自ドメインのみ
     ]
 )
 
@@ -46,59 +55,67 @@ CONTENT_SECURITY_POLICY = "; ".join(
 def create_app(config_overrides: dict[str, Any] | None = None):
     """アプリ本体を組み立てるファクトリ関数。
 
-    依存（DB/認証/CSRF/マイグレーション）をここで一元初期化し、
-    実行環境ごとの差分は設定値だけで吸収する。
+    何をする: Flask アプリを作り、設定・拡張機能・ルートを全部セットアップして返す。
+    なぜ必要: テストや本番で異なる設定を注入できるようにするため（ファクトリパターン）。
     """
     app = Flask(__name__)
     app.config.from_object(Config)
     app.config["SQLALCHEMY_DATABASE_URI"] = Config.database_uri()
 
+    # 環境変数の SECRET_KEY があれば設定に反映する。
     secret_key = os.environ.get("SECRET_KEY")
     if secret_key:
         app.config["SECRET_KEY"] = secret_key
 
+    # テスト等から渡された設定で上書きする。
     if config_overrides:
         app.config.update(config_overrides)
 
-    # PROXY_FIX_TRUSTED_HOPS が 1 以上のときだけ ProxyFix を WSGI ミドルウェアとして導入する。
-    # ProxyFix は X-Forwarded-For などのヘッダーを解釈して remote_addr を実クライアント IP に書き換える。
-    # hops=0 のデフォルトでは無効のままにし、ローカル公開や直接公開での IP 偽装を避ける。
-    # 単一の信頼できるリバースプロキシ配下では hops=1 を想定するが、実際の hop 数に合わせて調整する。
+    # --- ProxyFix（リバースプロキシ対応） ---
+    # Render 等では Nginx がアプリの前にいて、クライアントの本当の IP が見えない。
+    # ProxyFix は X-Forwarded-For ヘッダーを読んで本来の IP を復元する。
+    # hops=0（デフォルト）= 無効、hops=1 =「プロキシ1段」として有効にする。
     hops = int(app.config.get("PROXY_FIX_TRUSTED_HOPS", 0) or 0)
     if hops > 0:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
 
-    # Secure 属性は HTTPS 環境でのみ意味を持つ。ローカル HTTP 開発で True にすると
-    # ブラウザが Cookie を送らずログインできなくなるため、TESTING / DEBUG 時は False にする。
-    # config_overrides で明示指定された場合は上書きせずその値を優先する。
+    # --- Secure Cookie の自動切替 ---
+    # Secure=True → HTTPS でしか Cookie を送らない。
+    # ローカル開発は HTTP なので True だとログインできなくなる。
+    # → TESTING / DEBUG 時は自動で False にする。
     secure_cookies = not (app.config.get("TESTING") or app.config.get("DEBUG"))
     if not (config_overrides and "SESSION_COOKIE_SECURE" in config_overrides):
         app.config["SESSION_COOKIE_SECURE"] = secure_cookies
     if not (config_overrides and "REMEMBER_COOKIE_SECURE" in config_overrides):
         app.config["REMEMBER_COOKIE_SECURE"] = secure_cookies
 
-    # セッション改ざん対策の鍵が無い状態で起動しないための安全装置。
-    # 「動くこと」より「安全に動くこと」を優先して明示的に失敗させる。
+    # SECRET_KEY がないと Cookie の改ざん検知ができないので、起動を止める（安全装置）。
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY environment variable must be set.")
 
-    # 拡張機能はここで app に紐づける。migrate を有効にすることで、
-    # 起動時 create_all ではなく Alembic の履歴管理に統一できる。
+    # --- 拡張機能をアプリに紐づける ---
     db.init_app(app)
     login.init_app(app)
     csrf.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db)  # Alembic でテーブル変更を履歴管理
 
+    # --- Blueprint（=URLグループ）を登録 ---
     from app.auth import bp as auth_bp
     from app.todo import bp as todo_bp
 
-    app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(todo_bp, url_prefix="/todo")
+    app.register_blueprint(auth_bp, url_prefix="/auth")   # /auth/login, /auth/register 等
+    app.register_blueprint(todo_bp, url_prefix="/todo")    # /todo/, /todo/tasks/new 等
+
+    # --- アプリ直下のルート ---
 
     @app.route("/")
     def root():
+        """トップページ → ボード画面にリダイレクト。"""
         return redirect(url_for("todo.board"))
 
+    # PWA（Progressive Web App）関連ファイルを static/ から配信する。
+    # ブラウザが /sw.js 等のパスでアクセスしてくるので、static/ の中身を返す。
+    # max_age=0 で常に最新版を取りに行かせる。
     @app.route("/sw.js")
     def pwa_service_worker():
         return send_from_directory(
@@ -126,19 +143,21 @@ def create_app(config_overrides: dict[str, Any] | None = None):
             max_age=0,
         )
 
+    # --- セキュリティヘッダーを全レスポンスに付与 ---
     @app.after_request
     def apply_security_headers(response):
-        """全レスポンスにブラウザ側のセキュリティヘッダーを付与する。
+        """全レスポンスにセキュリティヘッダーを付ける。
 
-        アプリケーション層で設定することで、Nginx などの前段構成に関わらず
-        一貫したヘッダーを保証できる。各ヘッダーの役割は以下の通り。
-        - X-Content-Type-Options: MIME スニッフィングを防ぎ XSS リスクを低減する。
-        - X-Frame-Options: クリックジャッキング攻撃（iframe 埋め込み）をブロックする。
-        - Referrer-Policy: 外部サイトへのリンク時にリファラーで内部 URL が漏れるのを防ぐ。
-        - Permissions-Policy: カメラ・マイク・位置情報へのブラウザ API アクセスを封じる。
-        - CSP: スクリプト・スタイルの読み込み元をホワイトリストで制限する。
-        - HSTS: HTTPS 強制を宣言し、HTTP へのダウングレード攻撃（SSL ストリッピング）を防ぐ。
-          Secure cookie が有効な本番環境でのみ付与し、HTTP 開発環境では出力しない。
+        何をする: ブラウザに「このサイトのセキュリティルール」を伝えるヘッダーを追加。
+        なぜ必要: XSS・クリックジャッキング・中間者攻撃などをブラウザ側でも防ぐため。
+
+        各ヘッダーの役割:
+        - X-Content-Type-Options: ファイル種別の誤認を防ぐ
+        - X-Frame-Options: iframe 埋め込みを禁止（クリックジャッキング対策）
+        - Referrer-Policy: 外部リンク時にページ URL が漏れるのを防ぐ
+        - Permissions-Policy: カメラ・マイクなどのブラウザ API を使わせない
+        - CSP: 読み込み元の許可リスト（上で定義した CONTENT_SECURITY_POLICY）
+        - HSTS: HTTPS を強制する宣言（本番のみ。HTTP 開発環境では出さない）
         """
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -146,6 +165,7 @@ def create_app(config_overrides: dict[str, Any] | None = None):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
 
+        # HSTS は HTTPS 本番環境でのみ付ける。HTTP 開発中に出すとブラウザが壊れる。
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 

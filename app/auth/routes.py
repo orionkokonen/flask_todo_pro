@@ -1,3 +1,8 @@
+# ============================================================
+# auth/routes.py — 認証（ログイン・登録・ログアウト）のルート定義
+#
+# ユーザーがアカウントを作成・認証・退出するための画面と処理をまとめたファイル。
+# ============================================================
 from urllib.parse import urljoin, urlparse
 
 from flask import current_app, flash, make_response, redirect, render_template, request, url_for
@@ -11,14 +16,17 @@ from app.security import auth_rate_limiter
 
 
 def _is_safe_redirect_target(target: str) -> bool:
-    """リダイレクト先が同一ホストの URL かどうかを検証する。外部 URL への誘導（Open Redirect）を防ぐ。"""
+    """リダイレクト先が自分のサイト内かチェックする。
+
+    Open Redirect（＝悪意ある外部URLへユーザーを飛ばす攻撃）を防ぐための関数。
+    """
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
 
 
 def _client_ip() -> str:
-    """Flask から見えるクライアント IP を返す。ProxyFix が有効な場合は X-Forwarded-For 解釈後の値になる。"""
+    """アクセス元のIPアドレスを取得する。レート制限でユーザーを識別するために使う。"""
     return request.remote_addr or "unknown"
 
 
@@ -29,7 +37,10 @@ def _render_auth_template(
     status_code: int = 200,
     retry_after: int | None = None,
 ):
-    """認証テンプレートを描画し、必要に応じて Retry-After ヘッダーを付けてレスポンスを返す。"""
+    """認証ページのHTMLを組み立てて返すヘルパー関数。
+
+    retry_after が指定された場合、HTTPヘッダーで「何秒後に再試行できるか」をブラウザに伝える。
+    """
     context = {"form": form}
     if template_name == "auth/register.html":
         context["password_min_length"] = current_app.config["PASSWORD_MIN_LENGTH"]
@@ -41,10 +52,9 @@ def _render_auth_template(
 
 
 def _rate_limited_response(template_name: str, form, retry_after: int):
-    """レート制限超過時にユーザーへ警告を表示し 429 レスポンスを返す。
+    """短時間に何度もリクエストが来たとき、429（Too Many Requests）エラーを返す。
 
-    Retry-After ヘッダーを付与することで、クライアント（自動リトライツール等）に
-    次に試せるまでの待機時間を通知する HTTP 標準の仕組み。
+    HTTPステータス429＝「リクエストが多すぎる」ことを示す標準のエラーコード。
     """
     flash(
         "\u8a66\u884c\u56de\u6570\u304c\u591a\u3059\u304e\u307e\u3059\u3002"
@@ -61,14 +71,13 @@ def _rate_limited_response(template_name: str, form, retry_after: int):
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
-    """登録画面を表示し、フォーム送信時にユーザーアカウントを作成する。"""
+    """ユーザー登録ページ。新しいアカウントを作成する。"""
     form = RegistrationForm()
     bucket = f"register:{_client_ip()}"
 
     if request.method == "POST":
-        # validate_on_submit() より先に IP ごとの試行回数を確認する。
-        # バリデーション処理を実行する前にブロックすることで、
-        # 大量リクエストによるサーバー負荷も同時に抑制できる。
+        # フォーム検証より先にレート制限をチェックする。
+        # 重い処理を実行する前にブロックすることで、攻撃的な大量リクエストからサーバーを守る。
         allowed, retry_after = auth_rate_limiter.check(
             bucket,
             current_app.config["REGISTER_RATE_LIMIT_ATTEMPTS"],
@@ -83,15 +92,13 @@ def register():
         db.session.add(user)
         db.session.commit()
         auth_rate_limiter.reset(bucket)
-        # 登録完了直後にそのままログイン状態にする。
-        # ユーザーが「登録 → ログイン」と 2 回操作する手間を省き、登録直後の離脱を防ぐ UX 設計。
+        # 登録後すぐにログイン状態にして、二度手間を防ぐ（UX向上のため）。
         login_user(user)
         flash(
             "\u767b\u9332\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\u3002"
             "\u30ed\u30b0\u30a4\u30f3\u3057\u307e\u3057\u305f\u3002"
         )
-        # 登録後は常にボードトップへ遷移する。
-        # next パラメータを受け付けないことで、外部 URL への誘導（Open Redirect 攻撃）を防ぐ。
+        # 登録後は固定ページへ飛ばす。next パラメータを使わないのは Open Redirect 対策。
         return redirect(url_for("todo.board"))
 
     if request.method == "POST":
@@ -104,11 +111,12 @@ def register():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    """ログイン画面を表示し、フォーム送信時にユーザーを認証する。"""
+    """ログインページ。ユーザー名とパスワードで認証する。"""
     form = LoginForm()
     bucket = f"login:{_client_ip()}"
 
     if request.method == "POST":
+        # レート制限チェック（ブルートフォース攻撃＝パスワード総当たりを防ぐため）
         allowed, retry_after = auth_rate_limiter.check(
             bucket,
             current_app.config["LOGIN_RATE_LIMIT_ATTEMPTS"],
@@ -122,6 +130,8 @@ def login():
         if user and user.check_password(form.password.data):
             auth_rate_limiter.reset(bucket)
             login_user(user, remember=form.remember_me.data)
+            # ログイン前にアクセスしようとしたページがあればそこへ飛ばす（利便性のため）。
+            # ただし安全な URL かチェックしてからリダイレクトする（Open Redirect 対策）。
             next_page = request.args.get("next")
             if not next_page or not _is_safe_redirect_target(next_page):
                 next_page = url_for("todo.board")
@@ -131,6 +141,7 @@ def login():
             bucket,
             current_app.config["LOGIN_RATE_LIMIT_WINDOW_SECONDS"],
         )
+        # ユーザー名・パスワードのどちらが間違っているかは教えない（セキュリティ上の配慮）。
         flash(
             "\u30e6\u30fc\u30b6\u30fc\u540d\u307e\u305f\u306f"
             "\u30d1\u30b9\u30ef\u30fc\u30c9\u304c\u9055\u3044\u307e\u3059\u3002"
@@ -141,7 +152,7 @@ def login():
 @bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    """現在のユーザーをログアウトし、ログイン画面へリダイレクトする。"""
+    """ログアウト処理。POST のみ受け付けるのは CSRF 対策のため。"""
     logout_user()
     flash("\u30ed\u30b0\u30a2\u30a6\u30c8\u3057\u307e\u3057\u305f\u3002")
     return redirect(url_for("auth.login"))

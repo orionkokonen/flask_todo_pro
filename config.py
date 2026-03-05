@@ -1,51 +1,67 @@
+# ============================================================
+# config.py — アプリ全体の設定を一元管理するファイル
+#
+# セキュリティ・DB接続・パスワードルール・レート制限など、
+# アプリの振る舞いを決める値をここにまとめる。
+# 各モジュールはここを参照するので、変更が1箇所で済む。
+# ============================================================
 import os
 from datetime import timedelta
 
+# このファイル自身があるフォルダの絶対パス。SQLite のパス組み立てに使う。
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config:
-    # SECRET_KEY は起動時に必須で、環境変数から注入する。設定ファイルに直書きしてはならない。
+    # --- セッション暗号化キー ---
+    # Cookie の署名（=改ざん検知）に使う秘密鍵。環境変数から注入し、コードに直書きしない。
+    # 空のまま起動すると create_app() で RuntimeError になる（安全装置）。
     SECRET_KEY = None
+
+    # SQLAlchemy の変更追跡機能。メモリを消費するだけなので無効にする。
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # HttpOnly: JS から Cookie を読めなくする。
-    # → XSS（ページに悪意あるスクリプトを注入する攻撃）でセッションを盗まれるのを防ぐ。
-    # REMEMBER は「ログイン保持」チェック用の永続 Cookie。
+    # --- Cookie セキュリティ ---
+    # HttpOnly=True → JS から Cookie を読めなくする。
+    # XSS（=悪意あるスクリプトをページに注入する攻撃）でセッションを盗まれるのを防ぐ。
     SESSION_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_HTTPONLY = True
 
-    # SameSite=Lax: 別サイトからの POST で Cookie が送られない。
-    # → CSRF（ユーザーになりすまして偽リクエストを送る攻撃）を緩和する。
-    # Strict だと外部リンクからの遷移でログアウト扱いになるため Lax を選択。
+    # SameSite=Lax → 別サイトからの POST では Cookie が送られない。
+    # CSRF（=ユーザーになりすまして偽リクエストを送る攻撃）を緩和する。
+    # Strict だと外部リンクからの遷移でもログアウト扱いになるので Lax を選ぶ。
     SESSION_COOKIE_SAMESITE = "Lax"
     REMEMBER_COOKIE_SAMESITE = "Lax"
 
-    # CSRF トークン（正規のフォーム送信か検証する使い捨てコード）の有効期限（秒）。
-    # 無制限だと古いトークンで攻撃が成立しうるため 1 時間に制限。
+    # --- CSRF トークンの有効期限（秒） ---
+    # CSRF トークン = 「正規のフォームから送られた」ことを証明する使い捨てコード。
+    # 無期限だと古いトークンで攻撃されうるので、1時間（3600秒）に制限する。
     WTF_CSRF_TIME_LIMIT = 3600
 
-    # パスワードの最低文字数。ここで一元管理し、フォームやテンプレートから参照する。
+    # --- パスワードポリシー ---
+    # ここで一元管理し、フォーム（forms.py）やテンプレートから参照する。
     PASSWORD_MIN_LENGTH = 12
-    # 大文字・小文字・数字を必須にして辞書攻撃（よくある単語の総当たり）への耐性を高める。
-    # 記号は UX の障壁が大きいため任意。フラグ切替で要件を柔軟に調整できる。
+    # 大文字・小文字・数字を必須にして辞書攻撃（=よくある単語の総当たり）に強くする。
+    # 記号は入力が面倒なので任意。フラグで要件を柔軟に調整できる。
     PASSWORD_REQUIRE_UPPER = True
     PASSWORD_REQUIRE_LOWER = True
     PASSWORD_REQUIRE_DIGIT = True
     PASSWORD_REQUIRE_SYMBOL = False
 
-    # 「ログイン保持」チェック時の Cookie 有効期限。
-    # Flask-Login デフォルト（365 日）は長すぎるため 30 日に明示する。
+    # --- 「ログイン保持」Cookie の有効期限 ---
+    # Flask-Login のデフォルト（365日）は長すぎるので 30日 に明示する。
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
 
-    # リバースプロキシ（Render では Nginx 等）を経由する段数。0 で ProxyFix 無効。
-    # X-Forwarded-For（接続元 IP を伝えるヘッダー）を無条件に信頼すると
-    # IP 偽装が可能になるため、本番のプロキシ構成に合わせて設定する。
+    # --- リバースプロキシ設定 ---
+    # Render 等ではアプリの前に Nginx（=リバースプロキシ）がいる。
+    # ProxyFix で X-Forwarded-For ヘッダーから本当のクライアント IP を取得する。
+    # 0 = ProxyFix 無効（ローカル開発用）。本番では 1 に設定する。
     PROXY_FIX_TRUSTED_HOPS = 0
 
-    # ブルートフォース（パスワード総当たり）対策のレート制限。
-    # LOGIN: 60 秒に 5 回失敗でブロック。REGISTER: 120 秒に 6 回（入力ミスを考慮し緩め）。
-    # メモリ内管理のため再起動でリセットされるが、ポートフォリオ規模では十分。
+    # --- レート制限（ブルートフォース＝パスワード総当たり 対策） ---
+    # LOGIN:    60秒間に5回失敗 → 一時ブロック
+    # REGISTER: 120秒間に6回失敗 → 一時ブロック（入力ミスを考慮して緩め）
+    # メモリ内管理なので再起動でリセットされるが、ポートフォリオ規模では十分。
     LOGIN_RATE_LIMIT_ATTEMPTS = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60
     REGISTER_RATE_LIMIT_ATTEMPTS = 6
@@ -53,19 +69,22 @@ class Config:
 
     @staticmethod
     def database_uri() -> str:
-        """実行環境に応じて接続先DBを決定する。
+        """接続先DBを決める。
 
-        本番(Render)は環境変数を優先し、ローカルではSQLiteへフォールバックすることで、
-        セットアップ手順を最小化しつつ本番互換の構成を保つ。
+        処理の流れ:
+        1. 環境変数 DATABASE_URL / DATABASE_URI があれば PostgreSQL に接続
+        2. なければローカルの SQLite ファイルにフォールバック
+
+        なぜ必要: 本番(Render=PostgreSQL)とローカル(SQLite)で同じコードを使い回すため。
         """
         db_url = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_URI")
         if db_url:
             # Render が返す URL 形式（postgres:// や postgresql://）を
-            # SQLAlchemy 2 系が認識できる postgresql+psycopg:// に変換する。
+            # SQLAlchemy 2系が認識できる postgresql+psycopg:// に変換する。
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
             elif db_url.startswith("postgresql://"):
                 db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
             return db_url
-        # ローカル開発はDBサーバー不要で再現できるよう、プロジェクト配下SQLiteを使う。
+        # ローカル開発用: プロジェクト直下に SQLite ファイルを作る（DBサーバー不要）。
         return "sqlite:///" + os.path.join(basedir, "todo_app.db")
