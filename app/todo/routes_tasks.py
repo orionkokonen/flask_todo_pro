@@ -1,3 +1,9 @@
+"""タスク・サブタスクの CRUD ルート。
+
+タスクの新規作成・詳細表示・編集・削除・ステータス移動と、
+サブタスクの追加・完了切替・削除を担当する。
+各操作は @login_required と ensure_task_access で「誰でも操作できる」状態を防いでいる。
+"""
 from __future__ import annotations
 
 from flask import abort, flash, redirect, render_template, request, url_for
@@ -33,6 +39,8 @@ def task_new():
         project = None
         if form.project_id.data is not None:
             project = get_or_404(Project, form.project_id.data)
+            # DB への保存前にプロジェクトの権限チェック（認可）を行う。
+            # チェックなしで保存すると、他ユーザーのプロジェクトにタスクを混入できてしまう。
             ensure_project_access(project)
 
         task = Task(
@@ -138,6 +146,8 @@ def task_move(task_id: int):
     ensure_task_access(task)
 
     new_status = (request.form.get("status") or request.form.get("to") or "").upper()
+    # VALID_STATUSES に含まれない値は 400 で拒否する。
+    # フォームの選択肢を直接改ざんして不正なステータスを送れないよう、サーバー側でも検証する。
     if new_status not in Task.VALID_STATUSES:
         abort(400)
 

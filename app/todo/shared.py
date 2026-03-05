@@ -1,3 +1,8 @@
+"""todo Blueprint 内の複数ルートで共通利用するヘルパー群。
+
+アクセス制御・クエリ構築・進捗集計など、責務の異なるルートファイルが
+重複して書きがちな処理をここに集約し、変更箇所が一箇所に収まるようにしている。
+"""
 from __future__ import annotations
 
 from flask import abort, current_app
@@ -17,7 +22,12 @@ def get_or_404(model, object_id: int):
 
 
 def get_accessible_team_ids() -> list[int]:
-    """現在のユーザーが所属するチームの ID リストを返す。"""
+    """現在のユーザーが所属するチームの ID リストを返す。
+
+    TeamMember テーブルを参照することで、チームへの所属有無を動的に判定する。
+    プロジェクト・タスクのフィルタリング条件に使い、他チームのデータが
+    混入しないようアクセス範囲を絞る起点になる。
+    """
     return [
         tm.team_id
         for tm in TeamMember.query.filter_by(user_id=current_user.id).all()
@@ -25,7 +35,12 @@ def get_accessible_team_ids() -> list[int]:
 
 
 def get_accessible_projects_query(team_ids: list[int] | None = None):
-    """現在のユーザーがアクセスできる全プロジェクトのクエリを返す。"""
+    """現在のユーザーがアクセスできる全プロジェクトのクエリを返す。
+
+    個人プロジェクト（owner が自分 & team_id=None）と
+    チームプロジェクト（team_id が自分の所属チームのいずれか）を
+    union して一本化することで、ボードやプロジェクト一覧を 1 クエリで取得できる。
+    """
     if team_ids is None:
         team_ids = get_accessible_team_ids()
 
@@ -39,7 +54,11 @@ def get_accessible_projects_query(team_ids: list[int] | None = None):
 
 
 def ensure_project_access(project: Project) -> None:
-    """アクセス権のないプロジェクトへのアクセスを 403 で拒否する。"""
+    """アクセス権のないプロジェクトへのアクセスを 403 で拒否する（認可チェック）。
+
+    権限チェックを各ルートに分散させずこの関数に集約し、チェック漏れを防ぐ。
+    不正アクセスの試みはログに残し、後から監査できるようにしている。
+    """
     if not project.can_access(current_user):
         current_app.logger.warning(
             "project access forbidden: user_id=%s project_id=%s",
@@ -50,7 +69,11 @@ def ensure_project_access(project: Project) -> None:
 
 
 def ensure_task_access(task: Task) -> None:
-    """アクセス権のないタスクへのアクセスを 403 で拒否する。"""
+    """アクセス権のないタスクへのアクセスを 403 で拒否する（認可チェック）。
+
+    タスクがプロジェクトに属する場合はプロジェクトの権限判定に委譲し、
+    プロジェクト未所属なら作成者本人かどうかで判定する。
+    """
     if not task.can_access(current_user):
         current_app.logger.warning(
             "task access forbidden: user_id=%s task_id=%s",
@@ -75,7 +98,11 @@ def build_project_choices(team_ids: list[int] | None = None) -> list[tuple[int, 
 
 
 def build_progress_summary(total: int, done: int) -> dict[str, int]:
-    """サブタスク進捗を共通の辞書形式に正規化する。"""
+    """サブタスク進捗を共通の辞書形式に正規化する。
+
+    total が 0 のとき 0 除算が起きないよう三項演算子でガードし、
+    percent も含めて常に辞書が揃った状態で返す。
+    """
     total_count = int(total or 0)
     done_count = int(done or 0)
     percent = (done_count * 100 // total_count) if total_count else 0
@@ -87,7 +114,12 @@ def build_progress_summary(total: int, done: int) -> dict[str, int]:
 
 
 def load_subtask_progress_map(task_ids: list[int]) -> dict[int, dict[str, int]]:
-    """複数タスク分のサブタスク進捗をまとめて取得する。"""
+    """複数タスク分のサブタスク進捗をまとめて取得する。
+
+    タスクごとに個別クエリを発行する（N+1 問題）のではなく、
+    task_id IN (...) で一括 GROUP BY 集計することで DB への往復を 1 回に抑える。
+    ボード画面など多数のタスクを同時表示するときにとくに効果がある。
+    """
     progress_by_task_id = {
         task_id: build_progress_summary(0, 0)
         for task_id in task_ids
@@ -95,6 +127,8 @@ def load_subtask_progress_map(task_ids: list[int]) -> dict[int, dict[str, int]]:
     if not task_ids:
         return progress_by_task_id
 
+    # task_id ごとに合計数と完了数を集計する。
+    # coalesce で SUM が NULL になるケース（完了サブタスクが 0 件）を 0 に変換する。
     progress_rows = (
         db.session.query(
             SubTask.task_id,

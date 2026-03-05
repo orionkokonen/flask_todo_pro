@@ -1,3 +1,8 @@
+"""プロジェクトの一覧表示・新規作成・削除ルート。
+
+個人プロジェクトとチームプロジェクトを 1 つのモデルで管理し、
+削除権限はプロジェクト種別（個人 or チーム）ごとに 2 段階でチェックする。
+"""
 from __future__ import annotations
 
 from flask import abort, current_app, flash, redirect, render_template, url_for
@@ -37,6 +42,8 @@ def projects():
             team = None
         else:
             team = get_or_404(Team, team_id)
+            # チームプロジェクトを作成できるのはチームメンバーのみ。
+            # フォームの team_id を直接書き換えて他チームに紐づけるのを防ぐ。
             if not TeamMember.is_member(current_user.id, team.id):
                 abort(403)
 
@@ -62,6 +69,12 @@ def projects():
 @bp.route("/projects/<int:project_id>/delete", methods=["POST"])
 @login_required
 def project_delete(project_id: int):
+    """プロジェクトを削除する。削除権限は 2 段階でチェックする。
+
+    ①まず ensure_project_access でそのプロジェクトを「読める」かを確認（メンバー以外を弾く）。
+    ②次にプロジェクトの種別ごとに「削除できる」かを確認する。
+    個人プロジェクトは所有者のみ、チームプロジェクトはチームオーナーのみ削除できる。
+    """
     project = get_or_404(Project, project_id)
     ensure_project_access(project)
 

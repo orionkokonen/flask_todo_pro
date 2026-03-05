@@ -1,3 +1,8 @@
+"""チームの一覧・作成・詳細・メンバー管理ルート。
+
+チームは複数ユーザーがプロジェクトを共有する単位。
+メンバーの追加・削除はチームオーナーのみ行えるよう、多段の権限チェックを実装している。
+"""
 from __future__ import annotations
 
 from flask import abort, flash, redirect, render_template, url_for
@@ -25,6 +30,8 @@ def teams():
     if form.validate_on_submit():
         team = Team(name=form.name.data, owner_id=current_user.id)
         db.session.add(team)
+        # flush() で DB に仮挿入して team.id を確定させてから TeamMember を追加する。
+        # commit() を先にすると TeamMember の外部キー参照が失敗するため、この順序が必要。
         db.session.flush()
         db.session.add(TeamMember(team_id=team.id, user_id=current_user.id, role="owner"))
         db.session.commit()
@@ -84,9 +91,13 @@ def team_member_remove(team_id: int, user_id: int):
         abort(403)
 
     team_member = TeamMember.query.filter_by(team_id=team.id, user_id=user_id).first_or_404()
+    # owner を削除しようとするリクエストは不正な操作として 400 で拒否する。
+    # チームには必ず 1 人以上の owner が必要なため、保護が必要。
     if team_member.role == "owner":
         abort(400)
 
+    # 実行者がチームオーナーでなければ操作を拒否する（認可チェック）。
+    # 上の is_member チェックはチーム内かどうかだけ確認するので、このチェックが別途必要。
     if current_user.id != team.owner_id:
         abort(403)
 
