@@ -1,7 +1,8 @@
 # ============================================================
-# auth/routes.py — 認証（ログイン・登録・ログアウト）のルート定義
+# auth/routes.py — 本人確認（ログイン・登録・ログアウト）のルート定義
 #
-# ユーザーがアカウントを作成・認証・退出するための画面と処理をまとめたファイル。
+# ユーザーがアカウントを作成し、本人確認を経てサービスを利用するための
+# 画面と処理をまとめたファイル。
 # ============================================================
 from urllib.parse import urljoin, urlparse
 
@@ -37,7 +38,7 @@ def _render_auth_template(
     status_code: int = 200,
     retry_after: int | None = None,
 ):
-    """認証ページのHTMLを組み立てて返すヘルパー関数。
+    """ログイン・登録ページのHTMLを組み立てて返すヘルパー関数。
 
     retry_after が指定された場合、HTTPヘッダーで「何秒後に再試行できるか」をブラウザに伝える。
     """
@@ -76,8 +77,7 @@ def register():
     bucket = f"register:{_client_ip()}"
 
     if request.method == "POST":
-        # フォーム検証より先にレート制限をチェックする。
-        # 重い処理を実行する前にブロックすることで、攻撃的な大量リクエストからサーバーを守る。
+        # フォーム検証より先にレート制限をチェックし、大量リクエストからサーバーを守る。
         allowed, retry_after = auth_rate_limiter.check(
             bucket,
             current_app.config["REGISTER_RATE_LIMIT_ATTEMPTS"],
@@ -92,7 +92,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         auth_rate_limiter.reset(bucket)
-        # 登録後すぐにログイン状態にして、二度手間を防ぐ（UX向上のため）。
+        # 登録直後に自動ログインし、再入力の手間を省く。
         login_user(user)
         flash(
             "\u767b\u9332\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\u3002"
@@ -111,12 +111,12 @@ def register():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    """ログインページ。ユーザー名とパスワードで認証する。"""
+    """ログインページ。ユーザー名とパスワードで本人確認する。"""
     form = LoginForm()
     bucket = f"login:{_client_ip()}"
 
     if request.method == "POST":
-        # レート制限チェック（ブルートフォース攻撃＝パスワード総当たりを防ぐため）
+        # パスワード総当たり（ブルートフォース）攻撃を防ぐためのレート制限
         allowed, retry_after = auth_rate_limiter.check(
             bucket,
             current_app.config["LOGIN_RATE_LIMIT_ATTEMPTS"],
@@ -130,8 +130,7 @@ def login():
         if user and user.check_password(form.password.data):
             auth_rate_limiter.reset(bucket)
             login_user(user, remember=form.remember_me.data)
-            # ログイン前にアクセスしようとしたページがあればそこへ飛ばす（利便性のため）。
-            # ただし安全な URL かチェックしてからリダイレクトする（Open Redirect 対策）。
+            # ログイン前に行こうとしたページへ戻す。安全な URL か必ず検証する。
             next_page = request.args.get("next")
             if not next_page or not _is_safe_redirect_target(next_page):
                 next_page = url_for("todo.board")
