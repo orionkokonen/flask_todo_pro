@@ -2,7 +2,7 @@
 # forms.py — フォーム定義モジュール
 #
 # 画面の入力欄・ボタン・バリデーション（＝入力チェック）をまとめて管理する。
-# FlaskForm を継承すると CSRF トークン検証も自動で付く。
+# FlaskForm を継承すると CSRF トークン（＝偽造リクエスト防止の合言葉）検証が自動で付く。
 # ============================================================
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class RegistrationForm(FlaskForm):
         "パスワード",
         validators=[DataRequired()],
     )
-    # EqualTo で「パスワード」フィールドと一致しているか確認する
+    # EqualTo: 上の password と一致しなければエラーにし、入力ミスを防ぐ
     password2 = PasswordField(
         "パスワード（確認）",
         validators=[DataRequired(), EqualTo("password")],
@@ -51,20 +51,19 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField("登録")
 
     def validate_username(self, username):
-        """ユーザー名が既に使われていないか DB で確認する。
+        """ユーザー名の重複を DB で事前チェックする。
 
-        validate_<フィールド名> というメソッド名にすると、WTForms が自動で呼んでくれる。
-        DB の unique 制約だけだとエラー画面になるので、ここで先にチェックして分かりやすいメッセージを返す。
+        validate_<フィールド名> というメソッド名は WTForms が自動で呼ぶ規約。
+        DB の unique 制約だけだと生のエラー画面になるため、ここで先に防ぐ。
         """
         user = User.query.filter_by(username=username.data).first()
         if user:
             raise ValidationError("このユーザー名は既に使用されています。")
 
     def validate_password(self, password):
-        """パスワードが強度ポリシーを満たしているか検証する。
+        """パスワードが強度ポリシー（最低文字数・文字種など）を満たすか検証する。
 
-        必要な条件（文字数・大文字・小文字など）は config から読み込む。
-        コードを変えずに設定ファイルだけでポリシーを変更できる設計。
+        条件は config（設定ファイル）から読み込むので、コードを変えずにポリシーを調整できる。
         """
         password_value = password.data or ""
         min_length = current_app.config.get("PASSWORD_MIN_LENGTH", 12)
@@ -73,7 +72,7 @@ class RegistrationForm(FlaskForm):
         require_digit = current_app.config.get("PASSWORD_REQUIRE_DIGIT", True)
         require_symbol = current_app.config.get("PASSWORD_REQUIRE_SYMBOL", False)
 
-        # 有効な条件だけエラーメッセージに含める
+        # ON になっている条件だけエラーメッセージに含め、ユーザーに何が足りないか伝える
         requirements = []
         if require_upper:
             requirements.append("英大文字")
@@ -115,7 +114,7 @@ class TaskForm(FlaskForm):
     title = StringField("タイトル", validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("メモ", validators=[Optional(), Length(max=2000)])
 
-    # 選択式にして不正な値が入らないようにする
+    # 自由入力ではなく選択式にし、定義済みステータス以外の値を防ぐ
     status = SelectField(
         "状態 / 進捗",
         choices=[
@@ -175,9 +174,9 @@ class SubTaskForm(FlaskForm):
 
 
 class EmptyForm(FlaskForm):
-    """入力欄を持たない、CSRF トークン検証だけ行うフォーム。
+    """入力欄を持たない、CSRF トークン検証だけのフォーム。
 
-    削除ボタンなど、データ送信はないが CSRF 対策が必要な操作に使う。
+    削除ボタンのように送信データはないが、第三者による偽造リクエストを防ぐ必要がある操作に使う。
     """
 
     submit = SubmitField("送信")
