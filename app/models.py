@@ -1,7 +1,7 @@
 """DB モデル定義（User / Team / Project / Task / SubTask）。
 
-各モデルに can_access() を持たせ、アクセス権チェック（認可）をモデル層に集約している。
-テーブル間の関連は SQLAlchemy の relationship() で定義し、Python オブジェクトとして辿れる。
+各モデルに can_access() を持たせ、アクセス権チェック（認可＝誰に何を許すか）をモデル層に集約。
+テーブル間の関連は relationship() で定義し、team.members のように Python オブジェクトとして辿れる。
 """
 from __future__ import annotations
 
@@ -32,8 +32,8 @@ class Team(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
-    # cascade: チーム削除時にメンバー・プロジェクトも自動で連鎖削除する。
-    # lazy="dynamic": 全件ロードせず .count() や .filter() をクエリとして実行できる。
+    # cascade="all, delete-orphan": 親（チーム）を削除すると子も自動で連鎖削除される。
+    # lazy="dynamic": team.members でアクセスしたとき全件ロードせずクエリとして扱える。
     members = db.relationship(
         "TeamMember",
         back_populates="team",
@@ -54,7 +54,7 @@ class Team(db.Model):
 class TeamMember(db.Model):
     __tablename__ = "team_member"
 
-    # team_id + user_id の複合主キーにより、同一ユーザーの二重登録を DB レベルで防ぐ
+    # team_id + user_id を複合主キー（2列でユニーク）にし、同じユーザーの二重登録を DB レベルで防ぐ
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
     role = db.Column(db.String(20), default="member", nullable=False)  # owner / member
@@ -81,7 +81,7 @@ class User(UserMixin, db.Model):
     __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
-    # username は検索・ログインに頻繁に使うため index=True でインデックスを張る
+    # index=True: 検索を高速化する索引（辞書の目次のようなもの）を DB に作る
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     # パスワードはハッシュ化した値のみ保存し、平文は DB に残さない
     password_hash = db.Column(db.String(256), nullable=False)
@@ -102,19 +102,17 @@ class User(UserMixin, db.Model):
     )
 
     def set_password(self, password: str) -> None:
-        """受け取ったパスワードをハッシュ化して保存する。
+        """パスワードをハッシュ化（＝元に戻せない変換）して保存する。
 
-        werkzeug の generate_password_hash に method="scrypt" を明示し、
-        ソルト付きハッシュとして保存する。平文やシンプルな MD5/SHA1 に比べて安全。
+        scrypt は計算コストが高く、総当たり攻撃に強いハッシュ方式。
+        method を明示することでライブラリ更新時に方式が変わるのも防げる。
         """
-        # scrypt を明示してバージョンアップでハッシュ方式が変わるのを防ぐ。
-        # scrypt はメモリ消費が大きい設計で、GPU 総当たり攻撃にも高い耐性を持つ。
         self.password_hash = generate_password_hash(password, method="scrypt")
 
     def check_password(self, password: str) -> bool:
-        """入力パスワードとハッシュを比較する。
+        """入力パスワードとハッシュを比較し、一致すれば True を返す。
 
-        定数時間比較（タイミング攻撃対策）は werkzeug 内部で実施される。
+        比較にかかる時間を一定にする処理（タイミング攻撃対策）は werkzeug 内部で実施される。
         """
         return check_password_hash(self.password_hash, password)
 
@@ -122,7 +120,7 @@ class User(UserMixin, db.Model):
         return f"<User {self.id} {self.username!r}>"
 
 
-# Flask-Login がセッションからユーザーを復元する際に呼ばれるコールバック
+# Flask-Login がセッション（ログイン状態）からユーザーを復元する際に呼ばれるコールバック
 @login.user_loader
 def load_user(user_id: str):
     try:
@@ -139,8 +137,8 @@ class Project(db.Model):
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, default="", nullable=False)
 
-    # team_id が NULL なら個人プロジェクト、値があればチームプロジェクト。
-    # 1 つのモデルで両方を表現し、テーブル数を最小限に抑える設計。
+    # team_id が NULL（空）なら個人プロジェクト、値があればチームプロジェクト。
+    # 1 つのテーブルで両方を表現する設計。
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), nullable=True, index=True)
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
@@ -188,13 +186,13 @@ class Project(db.Model):
 class Task(db.Model):
     __tablename__ = "task"
 
-    # 許可されるステータスを定数として定義し、ハードコードの分散を防ぐ
+    # ステータスを定数にまとめ、コード中に文字列を直書き（ハードコード）するのを防ぐ
     STATUS_TODO = "TODO"
     STATUS_DOING = "DOING"
     STATUS_DONE = "DONE"
     STATUS_WISH = "WISH"  # Wishリスト用
 
-    # ステータス変更時はこのタプルに含まれるかを検証し、不正な値を弾く
+    # ステータス変更時に「この中にあるか？」で入力チェック（バリデーション）する
     VALID_STATUSES = (STATUS_TODO, STATUS_DOING, STATUS_DONE, STATUS_WISH)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -211,14 +209,14 @@ class Task(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
 
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
-    # onupdate により、編集のたびに自動で更新日時が記録される
+    # onupdate: レコードが更新されるたびに自動で現在時刻がセットされる
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     project = db.relationship("Project", back_populates="tasks")
     created_by = db.relationship("User", back_populates="tasks_created")
 
-    # lazy="dynamic": サブタスクを全件ロードせず、.count() や .filter() で
-    # 必要なデータだけ DB から取得できる（一覧画面でのパフォーマンス対策）。
+    # lazy="dynamic": task.subtasks はリストではなくクエリを返すので、
+    # .count() や .filter() で必要な分だけ DB から取得できる。
     subtasks = db.relationship(
         "SubTask",
         back_populates="task",
@@ -242,11 +240,7 @@ class Task(db.Model):
         return (self.due_date - date.today()).days
 
     def due_badge(self, soon_days: int = 3) -> dict:
-        """テンプレートから due.days / due.is_overdue 等で参照できる締切メタ情報を返す。
-
-        締切の状態（超過・当日・近い）を辞書形式でまとめることで、
-        テンプレート側の条件分岐を整理しやすくした。
-        """
+        """締切の状態を辞書で返す。テンプレートで due.is_overdue 等として参照できる。"""
         if not self.due_date:
             return {"days": None, "is_overdue": False, "is_today": False, "is_soon": False}
         days = (self.due_date - date.today()).days
