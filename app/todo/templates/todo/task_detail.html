@@ -38,8 +38,7 @@
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.board') }}"><i class="bi bi-arrow-left"></i> 戻る</a>
     <a class="btn btn-outline-primary" href="{{ url_for('todo.task_edit', task_id=task.id) }}"><i class="bi bi-pencil"></i> 編集</a>
-    <!-- data-confirm: app.js が送信前に確認ダイアログを出す（インライン JS 不要で CSP 安全）。 -->
-    <!-- hidden_tag(): CSRF トークンを隠しフィールドに埋め込み、正規フォーム経由か検証する。 -->
+    <!-- data-confirm: 確認ダイアログ。hidden_tag(): CSRF トークン。 -->
     <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除します。よろしいですか？">
       {{ delete_form.hidden_tag() }}
       <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>

@@ -1,3 +1,5 @@
+# migrations/env.py — Alembic（DBマイグレーション）の実行環境設定。
+# flask db upgrade / flask db migrate 時に自動で読み込まれる。
 import logging
 from logging.config import fileConfig
 
@@ -5,22 +7,19 @@ from flask import current_app
 
 from alembic import context
 
-# Alembic 実行時に読み込まれる設定オブジェクト。
-# ここから ini の値や CLI 引数へアクセスする。
 config = context.config
 
-# マイグレーションの実行ログをアプリと同じ粒度で追えるようにする。
+# マイグレーション実行ログをアプリと同じ粒度で出力する。
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
 
 def get_engine():
+    """Flask-SQLAlchemy のバージョン差を吸収して DB エンジンを取得する。"""
     try:
-        # 旧API互換: Flask-SQLAlchemy<3
-        return current_app.extensions['migrate'].db.get_engine()
+        return current_app.extensions['migrate'].db.get_engine()  # v2 以前
     except (TypeError, AttributeError):
-        # 現行API: Flask-SQLAlchemy>=3
-        return current_app.extensions['migrate'].db.engine
+        return current_app.extensions['migrate'].db.engine  # v3 以降
 
 
 def get_engine_url():

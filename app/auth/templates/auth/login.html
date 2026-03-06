@@ -1,3 +1,4 @@
+{# login.html — ログインフォーム。ユーザー名＋パスワードで本人確認する。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - ログイン{% endblock %}
@@ -15,8 +16,7 @@
           </div>
         </div>
         <form method="post" class="mt-3">
-          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込む。 #}
-          {# Flask-WTF がフォーム送信時にトークンを検証し、第三者サイトからの不正送信（CSRF 攻撃）を防ぐ。 #}
+          {# hidden_tag(): CSRF トークンを埋め込み、第三者サイトからの不正送信を防ぐ。 #}
           {{ form.hidden_tag() }}
 
           <div class="mb-3">

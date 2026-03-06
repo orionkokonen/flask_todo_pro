@@ -1,3 +1,4 @@
+{# projects.html — プロジェクト一覧（左）と新規作成フォーム（右）。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - プロジェクト{% endblock %}
@@ -41,8 +42,7 @@
                       {% endif %}
                     </td>
                     <td class="text-end">
-                      {# data-confirm: app.js が送信前に confirm() ダイアログを出す。 #}
-                      {# delete_form.hidden_tag() で CSRF トークンを埋め込み、削除リクエストが正しいセッション由来かをサーバーが検証できるようにする。 #}
+                      {# data-confirm: 確認ダイアログ。hidden_tag(): CSRF トークン。 #}
                       <form method="post" action="{{ url_for('todo.project_delete', project_id=p.id) }}" class="d-inline" data-confirm="削除しますか？（プロジェクト内のタスクも削除されます）">
                         {{ delete_form.hidden_tag() }}
                         <button class="btn btn-sm btn-outline-danger" type="submit" title="削除">
@@ -67,7 +67,7 @@
       <div class="card-body">
         <h2 class="h6">新規作成</h2>
         <form method="post">
-          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込む。 #}
+          {# CSRF トークン。 #}
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.name.label(class_='form-label') }}

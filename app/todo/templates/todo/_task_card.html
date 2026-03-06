@@ -1,3 +1,4 @@
+{# _task_card.html — ボードのタスクカード描画マクロ。board.html から呼ばれる。 #}
 {% macro badge_due(task, days, is_overdue, is_today, is_soon) -%}
   {% if task.due_date %}
     {% if is_overdue %}
@@ -15,12 +16,9 @@
 {% macro task_card(task, left=None, right=None, subtask_progress=None) -%}
   {% set due = task.due_badge() %}
   {% set progress = subtask_progress or {'done': 0, 'total': 0, 'percent': 0} %}
-  <!-- board.html から呼び出す共通のタスクカードマクロ。カードの見た目と操作をここに集約する。 -->
-  <!-- js-task-card-link: app.js がカード全体のクリックを検知するためのフック（JS が参照するクラス名）。 -->
-  <!-- data-detail-url: JS が遷移先 URL を取得するためのデータ属性。<a> でカード全体を囲むと -->
-  <!-- 内部のボタンやフォームが入れ子になり HTML が不正になるため、この方式を採用。 -->
-  <!-- tabindex="0" で Tab キーによるフォーカス移動を可能にし、 -->
-  <!-- role="link" / aria-label でスクリーンリーダー（視覚障害者向け読み上げ）に意図を伝える。 -->
+  <!-- js-task-card-link + data-detail-url: app.js がカード全体のクリックで詳細へ遷移させる仕組み。 -->
+  <!-- <a> で囲むと内部のフォームが壊れるため、data 属性 + JS 方式を採用。 -->
+  <!-- tabindex="0" / role="link" / aria-label: キーボード操作・スクリーンリーダー対応。 -->
   <div
     class="card task-card mb-2 js-task-card-link"
     data-detail-url="{{ url_for('todo.task_detail', task_id=task.id) }}"

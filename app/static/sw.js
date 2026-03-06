@@ -25,6 +25,8 @@ const CORE_ASSETS = [
   "/manifest.webmanifest",
 ];
 
+// install: 初回登録時に CORE_ASSETS をまとめてキャッシュに保存する。
+// skipWaiting() で旧バージョンの待機を飛ばし、新 SW をすぐ有効にする。
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -34,6 +36,8 @@ self.addEventListener("install", (event) => {
   );
 });
 
+// activate: バージョンが上がったとき、古いキャッシュを削除して新しいものに切り替える。
+// clients.claim() で既に開いているタブにも新 SW を即座に適用する。
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -49,6 +53,8 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// --- ヘルパー関数群: リクエスト種別の判定とキャッシュ戦略 ---
+
 function isNavigationRequest(request) {
   return request.mode === "navigate";
 }
@@ -57,6 +63,7 @@ function isStaticRequest(url) {
   return url.pathname.startsWith("/static/") || url.pathname === "/manifest.webmanifest";
 }
 
+// 自作 JS/CSS/manifest は更新頻度が高いため、vendor と区別する。
 function isMutableStaticRequest(url) {
   return (
     url.pathname.startsWith("/static/js/") ||
@@ -65,6 +72,7 @@ function isMutableStaticRequest(url) {
   );
 }
 
+// レスポンスが正常ならキャッシュに保存し、次回以降オフラインでも使えるようにする。
 function cacheResponse(request, response) {
   if (!response || !response.ok) {
     return response;
@@ -75,6 +83,7 @@ function cacheResponse(request, response) {
   return response;
 }
 
+// ネットワーク優先戦略: まずサーバーに問い合わせ、失敗したらキャッシュを使う。
 function networkFirst(request, options = {}) {
   const { ignoreSearch = false, offlineFallback = null } = options;
 

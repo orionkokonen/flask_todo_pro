@@ -1,3 +1,4 @@
+{# teams.html — チーム一覧（左）と新規チーム作成フォーム（右）。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - チーム{% endblock %}
@@ -49,7 +50,7 @@
       </div>
       <div class="card-body">
         <form method="post">
-          {# このフォームでは hidden_tag() が CSRF トークンを hidden フィールドとして埋め込み、第三者サイトからの不正なチーム作成を防ぐ。 #}
+          {# CSRF トークン（不正送信防止）。 #}
           {{ form.hidden_tag() }}
           <div class="mb-3">
             {{ form.name.label(class_='form-label') }}

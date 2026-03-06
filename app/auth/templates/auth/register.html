@@ -1,3 +1,4 @@
+{# register.html — 新規ユーザー登録フォーム。パスワードポリシーの案内付き。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - 新規登録{% endblock %}
@@ -16,8 +17,7 @@
         <div class="text-secondary small mb-3">ユーザー名とパスワードを設定してください。</div>
 
         <form method="post" class="vstack gap-3">
-          {# CSRF トークンを hidden フィールドとして埋め込む。 #}
-          {# Flask-WTF がフォーム送信時にトークンを検証し、第三者サイトからの不正送信（CSRF 攻撃）を防ぐ。 #}
+          {# CSRF トークン（不正送信防止）。詳細は login.html 参照。 #}
           {{ form.hidden_tag() }}
 
           <div>

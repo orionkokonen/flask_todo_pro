@@ -1,3 +1,5 @@
+{# base.html — 全ページ共通のレイアウト（ナビバー・フラッシュメッセージ・JS読み込み）。 #}
+{# 他のテンプレートは {% extends 'todo/base.html' %} でこの骨格を継承する。 #}
 <!doctype html>
 <html lang="ja">
 <head>
@@ -8,9 +10,7 @@
   <link rel="icon" href="/static/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <title>ToDo Pro{% block title %}{% endblock %}</title>
-  <!-- Bootstrap CSS・アイコンフォントをローカル配信（static/vendor/）から読み込む。 -->
-  <!-- CDN（外部サーバー）への依存をなくすことで、接続環境によって見た目が崩れるリスクを排除し、 -->
-  <!-- CSP の script-src / font-src を 'self' だけに絞り込めるようになった。 -->
+  <!-- Bootstrap をローカル配信（static/vendor/）から読み込み、CDN 依存を排除。CSP を 'self' のみに絞れる。 -->
   <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
   <style>
@@ -76,8 +76,7 @@
                 <li><a class="dropdown-item" href="{{ url_for('todo.task_new', status='WISH') }}"><i class="bi bi-star me-2"></i>Wish追加</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                  <!-- ログアウトは GET ではなく POST + CSRF トークンで保護する。 -->
-                  <!-- GET のままだと、外部サイトからのトップレベル遷移で強制ログアウトされる余地が残る。 -->
+                  <!-- ログアウトは POST + CSRF トークンで保護（GET だと外部リンクで強制ログアウトされる）。 -->
                   <form method="post" action="{{ url_for('auth.logout') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="dropdown-item" type="submit"><i class="bi bi-box-arrow-right me-2"></i>ログアウト</button>
