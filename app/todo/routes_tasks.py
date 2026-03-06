@@ -1,8 +1,8 @@
 """タスク・サブタスクの CRUD（作成・読取・更新・削除）ルート。
 
 全操作に共通する安全策:
-- @login_required  → 未ログインユーザーはログイン画面へリダイレクト（認証）
-- ensure_task_access → 他人のタスクは 403 Forbidden で拒否（認可＝権限チェック）
+- @login_required  → 未ログインユーザーはログイン画面へリダイレクト（本人確認）
+- ensure_task_access → 他人のタスクは 403 Forbidden で拒否（権限チェック）
 """
 from __future__ import annotations
 
@@ -41,13 +41,11 @@ def task_new():
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
 
-    # validate_on_submit(): POST かつ全入力チェック OK のときだけ True
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
             project = get_or_404(Project, form.project_id.data)
-            # DB への保存前にプロジェクトの権限チェック（認可）を行う。
-            # チェックなしで保存すると、他ユーザーのプロジェクトにタスクを混入できてしまう。
+            # 他ユーザーのプロジェクトへのタスク混入を防ぐため、保存前に権限チェック。
             ensure_project_access(project)
 
         task = Task(
@@ -105,8 +103,7 @@ def task_edit(task_id: int):
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
-    # obj=task: 既存のタスクの値をフォームの初期値に自動セットする
-    form = TaskForm(obj=task)
+    form = TaskForm(obj=task)  # obj=task で既存値をフォーム初期値にセット
     team_ids = get_accessible_team_ids()
     form.project_id.choices = [("", "— プロジェクトなし —")] + build_project_choices(team_ids)
 
@@ -138,7 +135,7 @@ def task_edit(task_id: int):
 @bp.route("/tasks/<int:task_id>/delete", methods=["POST"])
 @login_required
 def task_delete(task_id: int):
-    """タスク削除。認可済みリソースのみを削除対象にする。"""
+    """タスク削除。権限チェック済みのタスクのみ削除対象にする。"""
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
     db.session.delete(task)
@@ -154,10 +151,8 @@ def task_move(task_id: int):
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
-    # フォームから送られたステータス値を取得（"status" か "to" キー）
     new_status = (request.form.get("status") or request.form.get("to") or "").upper()
-    # ブラウザの開発者ツール等でフォーム値を改ざんされても不正な値を受け付けないよう、
-    # VALID_STATUSES（許可リスト）でサーバー側検証する。
+    # フォーム値の改ざん対策：許可リストでサーバー側検証する。
     if new_status not in Task.VALID_STATUSES:
         abort(400)
 
