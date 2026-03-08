@@ -1,9 +1,11 @@
+{# board.html — ボード画面本体。routes_board.py から受け取った `tasks_by_status` を4列に描画する。 #}
 {% extends 'todo/base.html' %}
 {% from 'todo/_task_card.html' import task_card with context %}
 
 {% block title %} - ボード{% endblock %}
 
 {% block content %}
+{# 件数は見出し・メトリクス・列ヘッダーで共通利用するので、最初にまとめて計算する。 #}
 {% set todo_count = tasks_by_status['TODO']|length %}
 {% set doing_count = tasks_by_status['DOING']|length %}
 {% set done_count = tasks_by_status['DONE']|length %}
@@ -137,6 +139,8 @@
 </div>
 
 <div class="row g-4 board-grid">
+  {# 表示順は業務の流れに合わせて固定。
+     アルファベット順ではなく「着手前→進行中→完了→保留候補」で読みやすくしている。 #}
   {% for st in ['TODO', 'DOING', 'DONE', 'WISH'] %}
     {% if st == 'TODO' %}
       {% set column_title = 'ToDo' %}
@@ -169,6 +173,8 @@
           <span class="board-column__count">{{ tasks_by_status[st]|length }}</span>
         </header>
 
+        {# 左右移動ボタンはこの配列順を基準に次の状態を決める。
+           1 箇所で順序を持つと、ボタン表示と遷移先がずれにくい。 #}
         {% set order = ['WISH', 'TODO', 'DOING', 'DONE'] %}
         {% set idx = order.index(st) %}
         {% set left_status = order[idx - 1] if idx > 0 else none %}

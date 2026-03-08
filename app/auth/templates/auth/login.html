@@ -1,3 +1,4 @@
+{# login.html — 認証の入口。入力数を絞り、ログイン後の再開を最短にする画面。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - ログイン{% endblock %}
@@ -30,6 +31,7 @@
       </div>
 
       <form method="post" class="mt-4">
+        {# hidden_tag() で CSRF トークンなど hidden フィールドをまとめて出力する。 #}
         {{ form.hidden_tag() }}
 
         <div class="mb-3">
