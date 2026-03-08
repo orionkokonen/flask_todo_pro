@@ -48,3 +48,18 @@
 - `app/todo/routes_projects.py` を新規追加（プロジェクト作成/削除を分離）。
 - `app/todo/routes_teams.py` を新規追加（チーム作成/詳細/メンバー管理を分離）。
 - `tests/test_task_crud.py` にテストを2件追加（`/move` 正常系、旧 `/set_status` が 404 を返すこと）。
+
+## [2026-03-08]
+
+### Changed
+
+- `app/todo/templates/todo/base.html` を再設計し、共通ナビゲーション、フラッシュメッセージ配置、認証状態ごとの操作導線を可読性重視のレイアウトに更新。
+- `app/static/css/app.css` をレイアウト側で正式に読み込む構成へ切り替え、配色、余白、タイポグラフィ、カード、フォーム、レスポンシブ調整を共通 CSS に集約。
+- `app/todo/templates/todo/board.html` のボード画面を情報の優先順位ベースで再構成し、ヒーロー、件数サマリー、絞り込み、ステータス列ヘッダを追加して一覧性を改善。
+- `app/todo/templates/todo/_task_card.html` のタスクカードを再設計し、期限、所属、プロジェクト、サブタスク進捗、移動/編集操作を読み取りやすい順序に整理。
+- `app/auth/templates/auth/login.html` と `app/auth/templates/auth/register.html` を同じデザイン言語で更新し、説明文とフォーム導線を整理した認証画面に刷新。
+
+### Fixed
+
+- 画面ごとに分散していたインラインスタイル依存を減らし、共通 CSS に寄せることで UI 調整時の見落としや差分の散在を起こしにくい構成に改善。
+- UI 2.0 への更新後も既存挙動が崩れないことを確認するため、回帰確認として `pytest` を実行し、既存テスト 43 件の通過を確認。
