@@ -1,59 +1,68 @@
-{# register.html — 新規ユーザー登録フォーム。パスワードポリシーの案内付き。 #}
 {% extends 'todo/base.html' %}
 
 {% block title %} - 新規登録{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-7 col-lg-5">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body p-4">
-        <div class="d-flex align-items-center gap-2 mb-2">
-          <div class="rounded-circle bg-success-subtle text-success d-grid" style="width:36px; height:36px; place-items:center;">
-            <i class="bi bi-person-plus"></i>
-          </div>
-          <h1 class="h5 mb-0">新規登録</h1>
+<div class="auth-panel">
+  <section class="auth-panel__intro">
+    <p class="page-hero__eyebrow">Create account</p>
+    <h1 class="page-hero__title">最初の一歩を迷わせない登録画面</h1>
+    <p class="page-hero__body">
+      必要な入力だけを残して、アカウント作成から最初のタスク作成まで進みやすい構成に整理しました。
+    </p>
+    <ul class="auth-panel__points">
+      <li><i class="bi bi-check2-circle"></i><span>ユーザー名とパスワードだけで利用を始められます。</span></li>
+      <li><i class="bi bi-check2-circle"></i><span>パスワード要件をその場で確認できるので、入力ミスを減らせます。</span></li>
+      <li><i class="bi bi-check2-circle"></i><span>登録後はボードから個人タスクもチームタスクもまとめて管理できます。</span></li>
+    </ul>
+  </section>
+
+  <section class="card auth-card">
+    <div class="card-body p-4 p-lg-5">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="auth-card__icon bg-success-subtle text-success">
+          <i class="bi bi-person-plus"></i>
         </div>
-        <div class="text-secondary small mb-3">ユーザー名とパスワードを設定してください。</div>
-
-        <form method="post" class="vstack gap-3">
-          {# CSRF トークン（不正送信防止）。詳細は login.html 参照。 #}
-          {{ form.hidden_tag() }}
-
-          <div>
-            <label class="form-label">{{ form.username.label.text }}</label>
-            {{ form.username(class_='form-control', placeholder='例) hayato', autocomplete='username') }}
-            {% for e in form.username.errors %}
-              <div class="text-danger small mt-1">{{ e }}</div>
-            {% endfor %}
-          </div>
-
-          <div>
-            <label class="form-label">{{ form.password.label.text }}</label>
-            {# password_min_length はビューから渡される設定値。テンプレートに数字をハードコードしない。 #}
-            {# autocomplete='new-password' でパスワードマネージャーに「新規入力」と認識させる。 #}
-            {{ form.password(class_='form-control', placeholder=password_min_length ~ '文字以上', autocomplete='new-password') }}
-            <div class="form-text">{{ password_min_length }}文字以上で、英大文字・英小文字・数字を含めてください。</div>
-            {% for e in form.password.errors %}
-              <div class="text-danger small mt-1">{{ e }}</div>
-            {% endfor %}
-          </div>
-
-          <div>
-            <label class="form-label">{{ form.password2.label.text }}</label>
-            {{ form.password2(class_='form-control', placeholder='もう一度入力', autocomplete='new-password') }}
-            {% for e in form.password2.errors %}
-              <div class="text-danger small mt-1">{{ e }}</div>
-            {% endfor %}
-          </div>
-
-          <div class="d-grid gap-2">
-            {{ form.submit(class_='btn btn-success') }}
-            <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">ログインへ</a>
-          </div>
-        </form>
+        <div>
+          <h2 class="h4 mb-1">新規登録</h2>
+          <div class="text-secondary small">アカウントを作成して、タスク管理を始めましょう。</div>
+        </div>
       </div>
+
+      <form method="post" class="mt-4">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.username.label(class_='form-label') }}
+          {{ form.username(class_='form-control', placeholder='例: hayato', autocomplete='username') }}
+          {% for e in form.username.errors %}
+            <div class="text-danger small mt-1">{{ e }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          {{ form.password.label(class_='form-label') }}
+          {{ form.password(class_='form-control', placeholder=password_min_length ~ '文字以上のパスワード', autocomplete='new-password') }}
+          <div class="form-text">{{ password_min_length }}文字以上で、推測されにくいパスワードを設定してください。</div>
+          {% for e in form.password.errors %}
+            <div class="text-danger small mt-1">{{ e }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-4">
+          {{ form.password2.label(class_='form-label') }}
+          {{ form.password2(class_='form-control', placeholder='もう一度入力', autocomplete='new-password') }}
+          {% for e in form.password2.errors %}
+            <div class="text-danger small mt-1">{{ e }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="d-grid gap-2">
+          {{ form.submit(class_='btn btn-success') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">ログインへ</a>
+        </div>
+      </form>
     </div>
-  </div>
+  </section>
 </div>
 {% endblock %}

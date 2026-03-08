@@ -1,21 +1,29 @@
-{# board.html — カンバンボード画面。TODO/DOING/DONE/WISH の 4 列でタスクを表示する。 #}
 {% extends 'todo/base.html' %}
-{# _task_card.html のマクロを読み込む。with context で url_for() 等を共有する。 #}
 {% from 'todo/_task_card.html' import task_card with context %}
 
 {% block title %} - ボード{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+{% set todo_count = tasks_by_status['TODO']|length %}
+{% set doing_count = tasks_by_status['DOING']|length %}
+{% set done_count = tasks_by_status['DONE']|length %}
+{% set wish_count = tasks_by_status['WISH']|length %}
+{% set total_count = todo_count + doing_count + done_count + wish_count %}
+{% set scope_labels = {'all': 'すべてのタスク', 'personal': '個人タスク', 'team': 'チームタスク'} %}
+
+<section class="page-hero">
   <div>
-    <h1 class="h4 mb-1">ボード</h1>
-    <div class="text-secondary small">
-      自分のタスクと、所属チームの共有タスクをまとめて管理できます。
-    </div>
+    <p class="page-hero__eyebrow">Readable UI 2.0</p>
+    <h1 class="page-hero__title">一覧性を優先したタスクボード</h1>
+    <p class="page-hero__body">
+      期限、所属、サブタスク進捗を同じ視線の流れで確認できるように整理しました。
+      次に着手するものと、進行中のものを迷わず見分けられます。
+    </p>
   </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-primary" href="{{ url_for('todo.task_new') }}">
-      <i class="bi bi-plus-lg me-1"></i>タスク追加
+
+  <div class="page-hero__actions">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('todo.task_new') }}">
+      <i class="bi bi-plus-lg me-1"></i>新しいタスク
     </a>
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.projects') }}">
       <i class="bi bi-folder2-open me-1"></i>プロジェクト
@@ -24,82 +32,165 @@
       <i class="bi bi-people me-1"></i>チーム
     </a>
   </div>
-</div>
+</section>
 
-<div class="card mt-3">
-  <div class="card-body">
-    <form id="filterForm" method="get" class="row gy-2 gx-2 align-items-end">
+<section class="hero-metrics">
+  <div class="hero-metric">
+    <span class="hero-metric__label">表示中</span>
+    <div class="hero-metric__value">
+      <strong>{{ total_count }}</strong>
+      <span>件</span>
+    </div>
+  </div>
+  <div class="hero-metric">
+    <span class="hero-metric__label">次に着手</span>
+    <div class="hero-metric__value">
+      <strong>{{ todo_count }}</strong>
+      <span>ToDo</span>
+    </div>
+  </div>
+  <div class="hero-metric">
+    <span class="hero-metric__label">進行中</span>
+    <div class="hero-metric__value">
+      <strong>{{ doing_count }}</strong>
+      <span>Doing</span>
+    </div>
+  </div>
+  <div class="hero-metric">
+    <span class="hero-metric__label">完了候補</span>
+    <div class="hero-metric__value">
+      <strong>{{ done_count + wish_count }}</strong>
+      <span>Done / Wish</span>
+    </div>
+  </div>
+</section>
+
+<section class="card board-filters">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+      <div>
+        <h2 class="h5 mb-1">表示条件</h2>
+        <p class="text-secondary small mb-0">
+          必要なタスクだけを絞り込んで、列ごとの優先度を読み取りやすくします。
+        </p>
+      </div>
+      <div class="filter-inline-note">
+        <span><i class="bi bi-funnel"></i>対象: {{ scope_labels.get(scope, 'すべてのタスク') }}</span>
+        <span><i class="bi bi-check2-circle"></i>Done: {{ '表示' if show_done else '非表示' }}</span>
+        {% if q %}
+          <span><i class="bi bi-search"></i>検索: {{ q }}</span>
+        {% endif %}
+        {% if project_id %}
+          <span><i class="bi bi-folder2"></i>プロジェクトで絞り込み中</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <form id="filterForm" method="get" class="row gy-3 gx-3 align-items-end">
       <div class="col-12 col-md-4">
-        <label class="form-label small text-secondary">検索</label>
-        <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="タイトルや説明で検索">
+        <label class="form-label" for="boardSearch">検索</label>
+        <input id="boardSearch" class="form-control" type="search" name="q" value="{{ q }}" placeholder="タイトルや説明で検索">
       </div>
       <div class="col-6 col-md-3">
-        <label class="form-label small text-secondary">スコープ</label>
-        <select class="form-select" name="scope">
-          <option value="all" {% if scope=='all' %}selected{% endif %}>すべて</option>
-          <option value="personal" {% if scope=='personal' %}selected{% endif %}>個人</option>
-          <option value="team" {% if scope=='team' %}selected{% endif %}>チーム</option>
+        <label class="form-label" for="boardScope">スコープ</label>
+        <select id="boardScope" class="form-select" name="scope">
+          <option value="all" {% if scope == 'all' %}selected{% endif %}>すべて</option>
+          <option value="personal" {% if scope == 'personal' %}selected{% endif %}>個人</option>
+          <option value="team" {% if scope == 'team' %}selected{% endif %}>チーム</option>
         </select>
       </div>
       <div class="col-6 col-md-3">
-        <label class="form-label small text-secondary">プロジェクト</label>
-        <select class="form-select" name="project">
+        <label class="form-label" for="boardProject">プロジェクト</label>
+        <select id="boardProject" class="form-select" name="project">
           <option value="">すべて</option>
           {% for p in projects %}
-            <option value="{{ p.id }}" {% if project_id==p.id %}selected{% endif %}>
-              {% if p.team %}🏷️ {{ p.team.name }} / {% else %}👤 {% endif %}{{ p.name }}
+            <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>
+              {% if p.team %}チーム / {% else %}個人 / {% endif %}{{ p.name }}
             </option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small text-secondary">表示</label>
-        <div class="form-check">
+      <div class="col-12 col-md-2">
+        <label class="form-label d-block">完了タスク</label>
+        <div class="form-check pt-2">
           <input class="form-check-input" type="checkbox" name="show_done" id="showDone" value="1" {% if show_done %}checked{% endif %}>
-          <label class="form-check-label" for="showDone">完了も表示</label>
+          <label class="form-check-label" for="showDone">Done も表示</label>
         </div>
       </div>
-      <div class="col-6 col-md-2 ms-auto text-end">
+      <div class="col-12 col-md-3 col-lg-2 ms-md-auto">
         <button class="btn btn-outline-primary w-100" type="submit">
           <i class="bi bi-funnel me-1"></i>適用
         </button>
       </div>
     </form>
   </div>
+</section>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4 mb-3">
+  <div>
+    <h2 class="h5 mb-1">ステータス別一覧</h2>
+    <p class="text-secondary small mb-0">
+      期限順を優先して並べています。左右の矢印で列を移動できます。
+    </p>
+  </div>
+  <div class="small text-secondary">表示件数: {{ total_count }}件</div>
 </div>
 
-<div class="row g-3 mt-1">
-  {% for st in ['TODO','DOING','DONE','WISH'] %}
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="kanban-col p-2 h-100">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <div class="fw-semibold">
-            {% if st=='TODO' %}<i class="bi bi-square me-1"></i>ToDo{% endif %}
-            {% if st=='DOING' %}<i class="bi bi-play-circle me-1"></i>Doing{% endif %}
-            {% if st=='DONE' %}<i class="bi bi-check2-circle me-1"></i>Done{% endif %}
-            {% if st=='WISH' %}<i class="bi bi-stars me-1"></i>Wish{% endif %}
-          </div>
-          <span class="badge text-bg-secondary">{{ tasks_by_status[st]|length }}</span>
-        </div>
-        {# ステータス遷移順を定義し、左右の移動先を算出する。端の列は移動ボタンを出さない。 #}
-        {% set order = ['WISH','TODO','DOING','DONE'] %}
-        {% set idx = order.index(st) %}
-        {% set left_status = order[idx-1] if idx > 0 else none %}
-        {% set right_status = order[idx+1] if idx < order|length - 1 else none %}
+<div class="row g-4 board-grid">
+  {% for st in ['TODO', 'DOING', 'DONE', 'WISH'] %}
+    {% if st == 'TODO' %}
+      {% set column_title = 'ToDo' %}
+      {% set column_hint = '次に着手するタスク' %}
+      {% set column_icon = 'square' %}
+    {% elif st == 'DOING' %}
+      {% set column_title = 'Doing' %}
+      {% set column_hint = '今進めているタスク' %}
+      {% set column_icon = 'play-circle' %}
+    {% elif st == 'DONE' %}
+      {% set column_title = 'Done' %}
+      {% set column_hint = '完了したタスク' %}
+      {% set column_icon = 'check2-circle' %}
+    {% else %}
+      {% set column_title = 'Wish' %}
+      {% set column_hint = 'あとで取り組みたい候補' %}
+      {% set column_icon = 'stars' %}
+    {% endif %}
 
-        {% for t in tasks_by_status[st] %}
-          {{ task_card(
-            t,
-            left=left_status,
-            right=right_status,
-            subtask_progress=task_subtask_progress.get(t.id, {'done': 0, 'total': 0, 'percent': 0})
-          ) }}
-        {% else %}
-          <div class="text-secondary small">この列にはまだ何もありません。</div>
-        {% endfor %}
-      </div>
+    <div class="col-12 col-md-6 col-xl-3 board-column-wrap">
+      <section class="kanban-col">
+        <header class="board-column__header">
+          <div>
+            <div class="board-column__eyebrow">Status</div>
+            <h3 class="board-column__title">
+              <i class="bi bi-{{ column_icon }} me-2"></i>{{ column_title }}
+            </h3>
+            <p class="board-column__hint">{{ column_hint }}</p>
+          </div>
+          <span class="board-column__count">{{ tasks_by_status[st]|length }}</span>
+        </header>
+
+        {% set order = ['WISH', 'TODO', 'DOING', 'DONE'] %}
+        {% set idx = order.index(st) %}
+        {% set left_status = order[idx - 1] if idx > 0 else none %}
+        {% set right_status = order[idx + 1] if idx < order|length - 1 else none %}
+
+        <div class="board-column__list">
+          {% for t in tasks_by_status[st] %}
+            {{ task_card(
+              t,
+              left=left_status,
+              right=right_status,
+              subtask_progress=task_subtask_progress.get(t.id, {'done': 0, 'total': 0, 'percent': 0})
+            ) }}
+          {% else %}
+            <div class="board-empty">
+              <i class="bi bi-inbox"></i>
+              <span>この列にはまだタスクがありません。</span>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
     </div>
   {% endfor %}
 </div>
-
 {% endblock %}
