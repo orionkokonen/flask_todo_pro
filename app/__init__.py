@@ -54,6 +54,13 @@ CONTENT_SECURITY_POLICY = "; ".join(
 
 
 def build_content_security_policy(*, upgrade_insecure_requests: bool = False) -> str:
+    """CSP 文字列を組み立てる。
+
+    `upgrade-insecure-requests` は「http の画像やスクリプトを見つけたら https に読み替えて」
+    というブラウザ向けの指示。
+    本番では便利だが、ローカルの HTTP 開発環境で常時付けると確認がしづらくなるため、
+    条件つきで足せるよう分離している。
+    """
     if not upgrade_insecure_requests:
         return CONTENT_SECURITY_POLICY
     return "; ".join((CONTENT_SECURITY_POLICY, "upgrade-insecure-requests"))
@@ -170,6 +177,7 @@ def create_app(config_overrides: dict[str, Any] | None = None):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        # Secure Cookie を使う環境を「本番相当」とみなし、その時だけ HTTP→HTTPS への読み替え指示を付ける。
         response.headers["Content-Security-Policy"] = build_content_security_policy(
             upgrade_insecure_requests=bool(app.config.get("SESSION_COOKIE_SECURE"))
         )

@@ -97,10 +97,16 @@ def test_login_failure_writes_audit_log(client, create_user, caplog):
 
 
 def test_login_unknown_user_runs_dummy_hash_check(client, monkeypatch):
+    """存在しないユーザーでもダミーのハッシュ照合を通すことを確認する。
+
+    「存在する時だけ照合する」実装だと処理時間の差から
+    アカウント有無を推測されやすくなるため、その差を小さくする仕組みの確認。
+    """
     calls: list[tuple[str, str]] = []
     original = auth_routes.check_password_hash
 
     def tracking_check_password_hash(password_hash: str, password: str) -> bool:
+        # 本物の関数はそのまま実行しつつ、「どの値で呼ばれたか」だけ記録する。
         calls.append((password_hash, password))
         return original(password_hash, password)
 

@@ -4,6 +4,7 @@
 - @login_required  → 未ログインユーザーはログイン画面へリダイレクト（本人確認）
 - ensure_task_access → 他人のタスクは 403 Forbidden で拒否（権限チェック）
 - rollback_session → 保存失敗後の DB セッションをきれいに戻す（次の操作を巻き添えにしない）
+- safe_referrer_or → 「元の画面へ戻る」時も外部サイトには飛ばさない
 """
 from __future__ import annotations
 
@@ -31,7 +32,8 @@ def _posted_project_or_abort() -> Project | None:
     """POST された project_id を先に検証する。
 
     画面のプルダウンには見えていなくても、送信データは開発者ツールなどで書き換えられる。
-    そのため「自分が触れないプロジェクトIDを直接送る」ケースをサーバー側で必ず止める。
+    そのため「自分が触れないプロジェクトIDを直接送る」ケースを
+    サーバー側で必ず止める。
     """
     raw_project_id = request.form.get("project_id")
     if raw_project_id in (None, ""):
@@ -69,6 +71,8 @@ def task_new():
         posted_project = _posted_project_or_abort()
 
     if form.validate_on_submit():
+        # POST 直後に確認済みの project をここで再利用する。
+        # 先に止めた改ざんチェックを、保存直前まで保ったまま使うため。
         project = posted_project
         if form.project_id.data is not None and project is None:
             # 保存に使うのは form 側で正規化された値なので、ここでも同じ権限確認を通す。
@@ -214,6 +218,8 @@ def task_move(task_id: int):
     ボードの左右ボタンと詳細画面のセレクト、どちらから来ても
     サーバー側では `status` という 1 つのキーだけ受け取る。
     入力口をそろえると、読み手が追う分岐が減って理解しやすい。
+    移動後は元の画面へ戻したいが、Referer をそのまま使うと危険なので
+    safe_referrer_or() で「自分のサイト内だけ戻す」ようにしている。
     """
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
@@ -277,7 +283,10 @@ def subtask_toggle(subtask_id: int):
     except SQLAlchemyError:
         rollback_session("subtask toggle")
         flash("サブタスク更新に失敗しました。時間を置いて再試行してください。", "danger")
+        # 一覧から押した時も詳細から押した時も、元の画面へ自然に戻す。
+        # ただし外部サイトの Referer は信用しない。
         return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
+    # 成功時も同じ考え方で安全に「元いた画面」へ戻す。
     return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
 
 
@@ -295,6 +304,8 @@ def subtask_delete(subtask_id: int):
     except SQLAlchemyError:
         rollback_session("subtask delete")
         flash("サブタスク削除に失敗しました。時間を置いて再試行してください。", "danger")
+        # 削除後も操作した画面に戻したいので Referer を使うが、
+        # 外部 URL へ飛ばされないよう安全確認つきで扱う。
         return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
     flash("サブタスクを削除しました。")
     return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))

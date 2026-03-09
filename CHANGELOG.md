@@ -75,6 +75,11 @@
 - `app/todo/routes_board.py` と `app/todo/shared.py` の偽条件フィルタを `filter(False)` から `db.false()` に統一。
 - `app/auth/routes.py` / `app/todo/routes_projects.py` / `app/todo/routes_tasks.py` / `app/todo/routes_teams.py` の主要な更新系ルートで、`db.session.commit()` 失敗時に `rollback()` してから復帰するようにし、壊れたセッション状態を次のリクエストへ持ち越しにくくした。
 - 認証失敗、登録時の重複ユーザー名、チームメンバー追加失敗の UI メッセージを汎用化し、ユーザー存在有無の手がかりを返しにくい構成へ見直し。
+- `app/redirects.py` を追加し、安全なリダイレクト判定を共通化。`app/todo/routes_tasks.py` では `request.referrer` 依存の遷移を同一オリジンのみ許可するように修正。
+- `app/todo/routes_board.py` で検索クエリの `%` / `_` をエスケープし、LIKE ワイルドカード解釈による過剰一致を防止。
+- `app/todo/routes_board.py` の `tasks_by_status` 受け渡しと `app/todo/routes_tasks.py` の `task_new` 検証フローを整理。
+- `app/auth/routes.py` で存在しないユーザーにもダミーハッシュ照合を適用し、ログイン失敗時の経路差を縮小。
+- `app/__init__.py` で `upgrade-insecure-requests` を本番相当時のみ付与するよう調整。
 
 ### Changed
 
@@ -88,6 +93,8 @@
 - 回帰確認として `pytest` を実行し、48 件のテスト通過を確認。
 - `app/db_utils.py` を新規追加し、DB 書き込み失敗時の `rollback()` と例外ログ出力を共通化。
 - `tests/test_auth_security.py` / `tests/test_task_crud.py` / `tests/test_team_access_control.py` に、登録・タスク作成の commit 失敗時 rollback と、列挙対策メッセージの回帰テストを追加。
+- `tests/test_task_crud.py` / `tests/test_board_render.py` / `tests/test_auth_security.py` / `tests/test_security_headers.py` に、安全なリダイレクト、LIKE エスケープ、ダミーハッシュ照合、CSP 条件付与の回帰テストを追加。
+- 対象 4 ファイルの `pytest` 実行で `30 passed, 1 warning` を確認。
 
 ### Docs
 

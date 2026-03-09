@@ -56,6 +56,11 @@ def test_board_search_treats_percent_as_literal(
     create_user,
     login,
 ):
+    """`%` をワイルドカードではなく普通の文字として検索できることを確認する。
+
+    SQL の LIKE 検索では `%` が「何文字でも」に化けるため、
+    エスケープを忘れると一致件数が広がりすぎる。
+    """
     user = create_user("board_percent_user", "password123")
     create_task(user, title="literal 100% match")
     create_task(user, title="literal 1000 match")
@@ -77,6 +82,11 @@ def test_board_search_treats_underscore_as_literal(
     create_user,
     login,
 ):
+    """`_` もワイルドカードではなく普通の文字として検索できることを確認する。
+
+    `_` は LIKE 検索で「任意の1文字」を表すため、
+    これもエスケープしないと想定外の候補が混ざってしまう。
+    """
     user = create_user("board_underscore_user", "password123")
     create_task(user, title="literal_under_score")
     create_task(user, title="literalXunderXscore")

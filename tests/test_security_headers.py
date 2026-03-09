@@ -131,4 +131,5 @@ def test_hsts_is_enabled_when_secure_cookies_are_enabled(app_factory):
 
     assert response.status_code == 200
     assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+    # 本番相当では mixed content（https ページ内の http 読み込み）を避ける指示も有効になる。
     assert "upgrade-insecure-requests" in response.headers["Content-Security-Policy"]

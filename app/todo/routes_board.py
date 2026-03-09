@@ -2,6 +2,8 @@
 
 タスクを TODO / DOING / DONE / WISH の 4 列に振り分けて一覧表示する。
 フィルタリング（スコープ・プロジェクト・キーワード・完了表示切替）もここで処理する。
+検索キーワードでは `%` と `_` を普通の文字として扱い、
+SQL のワイルドカードとして暴れないようにしている。
 タスクの作成・編集・削除は routes_tasks.py が担当。
 """
 from __future__ import annotations
@@ -23,6 +25,12 @@ from app.todo.shared import (
 
 
 def _escape_like(term: str) -> str:
+    """LIKE 検索で特別扱いされる記号を、普通の文字として扱える形にする。
+
+    `%` は「何文字でも」、`_` は「1文字なら何でも」という意味を持つ。
+    ユーザーがそれらを検索文字として入力した時に、
+    意図しない広い一致にならないようエスケープする。
+    """
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
@@ -81,6 +89,8 @@ def board():
     # 英字の大文字・小文字を気にせず部分一致検索する。
     # 例: "task" でも "Task" でも同じように見つけられる。
     if q:
+        # 前後の % は「部分一致」のためにこちらで付ける。
+        # 中身の % / _ は _escape_like() で無害化してから埋め込む。
         like = f"%{_escape_like(q)}%"
         base = base.filter(
             Task.title.ilike(like, escape="\\")
@@ -104,7 +114,8 @@ def board():
     def by_status(status: str):
         return [task for task in tasks if task.status == status]
 
-    # テンプレートが列ごとに描画しやすいよう、ステータス名 → タスク一覧の形にする。
+    # テンプレート側へは 1 つの辞書だけ渡す。
+    # 「列ごとに別々の変数を渡す」より追いやすく、列の追加や変更にも強い。
     tasks_by_status = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),

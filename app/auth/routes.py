@@ -22,10 +22,15 @@ def _is_safe_redirect_target(target: str) -> bool:
     """リダイレクト先が自分のサイト内かチェックする。
 
     Open Redirect（＝悪意ある外部URLへユーザーを飛ばす攻撃）を防ぐための関数。
+    実体は app.redirects 側にあり、このファイルでは「認証まわりで何を守るか」が
+    読み取りやすいよう薄いラッパーにしている。
     """
     return is_safe_redirect_target(target)
 
 
+# ユーザーが存在しない時にもハッシュ照合を 1 回通すためのダミー値。
+# 「存在する時だけ重い処理をする」差があると、応答時間から
+# ユーザー有無を推測されやすくなるので、その差を小さくする目的で使う。
 _DUMMY_PASSWORD_HASH = generate_password_hash("codex-dummy-password", method="scrypt")
 
 
@@ -157,6 +162,7 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         password_matches = False
         if user is None:
+            # 結果は使わず、「照合処理を通った」という事実だけをそろえる。
             check_password_hash(_DUMMY_PASSWORD_HASH, form.password.data)
         else:
             password_matches = user.check_password(form.password.data)
@@ -172,7 +178,8 @@ def login():
                 user.username,
                 _client_ip(),
             )
-            # ログイン前に行こうとしたページへ戻す。安全な URL か必ず検証する。
+            # ログイン前に行こうとしたページへ戻す。
+            # ただし next に外部 URL を入れられると危険なので、安全確認を必ず通す。
             next_page = request.args.get("next")
             if not next_page or not is_safe_redirect_target(next_page):
                 next_page = url_for("todo.board")

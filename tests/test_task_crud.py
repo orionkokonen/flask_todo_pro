@@ -183,6 +183,11 @@ def test_task_move_ignores_external_referrer_redirect(
     create_user,
     login,
 ):
+    """外部サイト由来の Referer は採用せず、既定の安全な画面へ戻すことを確認する。
+
+    更新後の戻り先を Referer 任せにすると、攻撃者が用意した外部 URL へ
+    ユーザーを送り出す穴になりうるため、その回帰テスト。
+    """
     user = create_user("move_referrer_user", "password123")
     task = create_task(user, title="Move referrer fallback")
 
@@ -207,6 +212,10 @@ def test_task_move_keeps_safe_same_origin_referrer(
     create_user,
     login,
 ):
+    """同じサイト内の Referer なら、その画面へ戻してよいことを確認する。
+
+    安全性を上げつつ、正規ユーザーの「操作後に元の画面へ戻る」使い勝手も壊さない。
+    """
     user = create_user("move_safe_referrer_user", "password123")
     task = create_task(user, title="Move safe referrer")
 
