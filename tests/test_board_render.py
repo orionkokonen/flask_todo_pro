@@ -48,3 +48,45 @@ def test_board_renders_subtask_progress(app, client, create_user):
     # カード内の操作ボタン（左右移動・編集）が引き続き出力されていることを確認する。
     assert b"bi-arrow-right" in response.data
     assert b"bi-pencil" in response.data
+
+
+def test_board_search_treats_percent_as_literal(
+    client,
+    create_task,
+    create_user,
+    login,
+):
+    user = create_user("board_percent_user", "password123")
+    create_task(user, title="literal 100% match")
+    create_task(user, title="literal 1000 match")
+
+    login_response = login("board_percent_user", "password123")
+    assert login_response.status_code == 302
+
+    response = client.get("/todo/?q=%25")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "literal 100% match" in body
+    assert "literal 1000 match" not in body
+
+
+def test_board_search_treats_underscore_as_literal(
+    client,
+    create_task,
+    create_user,
+    login,
+):
+    user = create_user("board_underscore_user", "password123")
+    create_task(user, title="literal_under_score")
+    create_task(user, title="literalXunderXscore")
+
+    login_response = login("board_underscore_user", "password123")
+    assert login_response.status_code == 302
+
+    response = client.get("/todo/?q=_")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "literal_under_score" in body
+    assert "literalXunderXscore" not in body

@@ -15,6 +15,7 @@ from app import db
 from app.db_utils import rollback_session
 from app.forms import EmptyForm, SubTaskForm, TaskForm
 from app.models import Project, SubTask, Task
+from app.redirects import safe_referrer_or
 from app.todo import bp
 from app.todo.shared import (
     build_project_choices,
@@ -54,6 +55,7 @@ def task_new():
     POST: バリデーション（入力チェック）通過後に DB 保存してボードへリダイレクト。
     """
     form = TaskForm()
+    posted_project = None
     team_ids = get_accessible_team_ids()
     # プルダウンの選択肢を動的に設定（アクセスできるプロジェクトのみ表示）
     form.project_id.choices = [("", "— プロジェクトなし —")] + build_project_choices(team_ids)
@@ -64,11 +66,11 @@ def task_new():
         form.status.data = preset_status
     # 送信値の偽装はフォーム検証とは別問題なので、POST が来た時点で先に止める。
     if request.method == "POST":
-        _posted_project_or_abort()
+        posted_project = _posted_project_or_abort()
 
     if form.validate_on_submit():
-        project = None
-        if form.project_id.data is not None:
+        project = posted_project
+        if form.project_id.data is not None and project is None:
             # 保存に使うのは form 側で正規化された値なので、ここでも同じ権限確認を通す。
             project = get_or_404(Project, form.project_id.data)
             # 他ユーザーのプロジェクトへ勝手にタスクを混ぜるのを防ぐ。
@@ -229,10 +231,10 @@ def task_move(task_id: int):
     except SQLAlchemyError:
         rollback_session("task move")
         flash("ステータス更新に失敗しました。時間を置いて再試行してください。", "danger")
-        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
+        return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
     # 元の画面へ戻すと操作感が自然。
     # 参照元が取れない場合だけ安全な既定値としてボードへ戻す。
-    return redirect(request.referrer or url_for("todo.board"))
+    return redirect(safe_referrer_or(url_for("todo.board")))
 
 
 @bp.route("/tasks/<int:task_id>/subtasks", methods=["POST"])
@@ -275,8 +277,8 @@ def subtask_toggle(subtask_id: int):
     except SQLAlchemyError:
         rollback_session("subtask toggle")
         flash("サブタスク更新に失敗しました。時間を置いて再試行してください。", "danger")
-        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
-    return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
+        return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
+    return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
 
 
 @bp.route("/subtasks/<int:subtask_id>/delete", methods=["POST"])
@@ -293,6 +295,6 @@ def subtask_delete(subtask_id: int):
     except SQLAlchemyError:
         rollback_session("subtask delete")
         flash("サブタスク削除に失敗しました。時間を置いて再試行してください。", "danger")
-        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
+        return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
     flash("サブタスクを削除しました。")
-    return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
+    return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))

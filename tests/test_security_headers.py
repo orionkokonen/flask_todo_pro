@@ -33,6 +33,7 @@ def test_security_headers_are_set_on_responses(client):
     assert "style-src 'self' 'unsafe-inline'" in csp
     assert "font-src 'self'" in csp
     assert "cdn.jsdelivr.net" not in csp
+    assert "upgrade-insecure-requests" not in csp
     # テスト環境では SESSION_COOKIE_SECURE=False のため HSTS は付与されない
     assert "Strict-Transport-Security" not in response.headers
 
@@ -130,3 +131,4 @@ def test_hsts_is_enabled_when_secure_cookies_are_enabled(app_factory):
 
     assert response.status_code == 200
     assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+    assert "upgrade-insecure-requests" in response.headers["Content-Security-Policy"]

@@ -22,6 +22,10 @@ from app.todo.shared import (
 )
 
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @bp.route("/", methods=["GET"])
 @login_required
 def board():
@@ -77,8 +81,11 @@ def board():
     # 英字の大文字・小文字を気にせず部分一致検索する。
     # 例: "task" でも "Task" でも同じように見つけられる。
     if q:
-        like = f"%{q}%"
-        base = base.filter(Task.title.ilike(like) | Task.description.ilike(like))
+        like = f"%{_escape_like(q)}%"
+        base = base.filter(
+            Task.title.ilike(like, escape="\\")
+            | Task.description.ilike(like, escape="\\")
+        )
 
     if not show_done:
         base = base.filter(Task.status != Task.STATUS_DONE)
@@ -98,7 +105,7 @@ def board():
         return [task for task in tasks if task.status == status]
 
     # テンプレートが列ごとに描画しやすいよう、ステータス名 → タスク一覧の形にする。
-    columns = {
+    tasks_by_status = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),
         Task.STATUS_DONE: by_status(Task.STATUS_DONE),
@@ -108,8 +115,7 @@ def board():
     return render_template(
         "todo/board.html",
         projects=projects,
-        columns=columns,
-        tasks_by_status=columns,
+        tasks_by_status=tasks_by_status,
         project_id=project_id,
         scope=scope,
         q=q,

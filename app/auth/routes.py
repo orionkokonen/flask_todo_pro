@@ -4,17 +4,17 @@
 # ユーザーがアカウントを作成し、本人確認を経てサービスを利用するための
 # 画面と処理をまとめたファイル。
 # ============================================================
-from urllib.parse import urljoin, urlparse
-
 from flask import current_app, flash, make_response, redirect, render_template, request, url_for
 from flask_login import login_required, login_user, logout_user
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
 from app.auth import bp
 from app.db_utils import rollback_session
 from app.forms import LoginForm, RegistrationForm
 from app.models import User
+from app.redirects import is_safe_redirect_target
 from app.security import auth_rate_limiter
 
 
@@ -23,9 +23,10 @@ def _is_safe_redirect_target(target: str) -> bool:
 
     Open Redirect（＝悪意ある外部URLへユーザーを飛ばす攻撃）を防ぐための関数。
     """
-    ref_url = urlparse(request.host_url)
-    test_url = urlparse(urljoin(request.host_url, target))
-    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
+    return is_safe_redirect_target(target)
+
+
+_DUMMY_PASSWORD_HASH = generate_password_hash("codex-dummy-password", method="scrypt")
 
 
 def _client_ip() -> str:
@@ -154,7 +155,13 @@ def login():
         # まずユーザー名で探し、見つかったときだけパスワード照合へ進む。
         # ただし画面には「どちらが違ったか」は出さず、推測材料を増やさない。
         user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
+        password_matches = False
+        if user is None:
+            check_password_hash(_DUMMY_PASSWORD_HASH, form.password.data)
+        else:
+            password_matches = user.check_password(form.password.data)
+
+        if user and password_matches:
             # 成功した時点で失敗回数を消し、次回ログイン時に影響が残らないようにする。
             auth_rate_limiter.reset(bucket)
             login_user(user, remember=form.remember_me.data)
@@ -167,7 +174,7 @@ def login():
             )
             # ログイン前に行こうとしたページへ戻す。安全な URL か必ず検証する。
             next_page = request.args.get("next")
-            if not next_page or not _is_safe_redirect_target(next_page):
+            if not next_page or not is_safe_redirect_target(next_page):
                 next_page = url_for("todo.board")
             return redirect(next_page)
 

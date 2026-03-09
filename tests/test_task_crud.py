@@ -177,6 +177,53 @@ def test_task_move_updates_status_via_current_route(
         assert persisted.status == Task.STATUS_DONE
 
 
+def test_task_move_ignores_external_referrer_redirect(
+    client,
+    create_task,
+    create_user,
+    login,
+):
+    user = create_user("move_referrer_user", "password123")
+    task = create_task(user, title="Move referrer fallback")
+
+    login_response = login("move_referrer_user", "password123")
+    assert login_response.status_code == 302
+
+    response = client.post(
+        f"/todo/tasks/{task.id}/move",
+        data={"status": Task.STATUS_DONE},
+        headers={"Referer": "https://evil.example/steal"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/todo/")
+    assert "evil.example" not in response.headers["Location"]
+
+
+def test_task_move_keeps_safe_same_origin_referrer(
+    client,
+    create_task,
+    create_user,
+    login,
+):
+    user = create_user("move_safe_referrer_user", "password123")
+    task = create_task(user, title="Move safe referrer")
+
+    login_response = login("move_safe_referrer_user", "password123")
+    assert login_response.status_code == 302
+
+    response = client.post(
+        f"/todo/tasks/{task.id}/move",
+        data={"status": Task.STATUS_DONE},
+        headers={"Referer": f"http://localhost/todo/tasks/{task.id}"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == f"http://localhost/todo/tasks/{task.id}"
+
+
 def test_legacy_task_set_status_route_returns_404(
     client,
     create_task,

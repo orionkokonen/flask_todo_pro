@@ -53,6 +53,12 @@ CONTENT_SECURITY_POLICY = "; ".join(
 )
 
 
+def build_content_security_policy(*, upgrade_insecure_requests: bool = False) -> str:
+    if not upgrade_insecure_requests:
+        return CONTENT_SECURITY_POLICY
+    return "; ".join((CONTENT_SECURITY_POLICY, "upgrade-insecure-requests"))
+
+
 def create_app(config_overrides: dict[str, Any] | None = None):
     """アプリ本体を組み立てるファクトリ関数。
 
@@ -164,7 +170,9 @@ def create_app(config_overrides: dict[str, Any] | None = None):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        response.headers["Content-Security-Policy"] = build_content_security_policy(
+            upgrade_insecure_requests=bool(app.config.get("SESSION_COOKIE_SECURE"))
+        )
 
         # HSTS は「このサイトには今後も HTTPS で来て」とブラウザに覚えさせる仕組み。
         # 開発中の HTTP 環境で出すと動作確認しづらくなるので、本番相当の時だけ付ける。

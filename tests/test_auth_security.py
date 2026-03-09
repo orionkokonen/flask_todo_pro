@@ -10,6 +10,7 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
+import app.auth.routes as auth_routes
 from app import db
 from app.models import User
 
@@ -93,6 +94,26 @@ def test_login_failure_writes_audit_log(client, create_user, caplog):
     assert response.status_code == 200
     assert "login failed:" in caplog.text
     assert "username=audit_failed_user" in caplog.text
+
+
+def test_login_unknown_user_runs_dummy_hash_check(client, monkeypatch):
+    calls: list[tuple[str, str]] = []
+    original = auth_routes.check_password_hash
+
+    def tracking_check_password_hash(password_hash: str, password: str) -> bool:
+        calls.append((password_hash, password))
+        return original(password_hash, password)
+
+    monkeypatch.setattr(auth_routes, "check_password_hash", tracking_check_password_hash)
+
+    response = client.post(
+        "/auth/login",
+        data={"username": "missing-user", "password": "WrongPass123"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert calls == [(auth_routes._DUMMY_PASSWORD_HASH, "WrongPass123")]
 
 
 def test_register_rejects_password_shorter_than_min_length(app, client):
