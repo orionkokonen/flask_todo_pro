@@ -123,7 +123,10 @@ def test_task_move_rejects_legacy_to_param(
     create_user,
     login,
 ):
-    """status パラメータのみ受け付け、旧 to パラメータは 400 にする。"""
+    """status パラメータのみ受け付け、旧 to パラメータは 400 にする。
+
+    入力口を 1 つに決めておくと、読み手も保守側も追うべき分岐が減る。
+    """
     user = create_user("legacy_move_user", "password123")
     task = create_task(user, title="Legacy move")
 

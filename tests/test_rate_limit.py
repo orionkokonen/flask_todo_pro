@@ -34,7 +34,10 @@ def _post_weak_registration(client, username: str, forwarded_for: str | None = N
 
 
 def test_rate_limiter_prune_removes_empty_bucket(monkeypatch):
-    """期限切れで空になったバケットは内部辞書から削除される。"""
+    """期限切れで空になったバケットは内部辞書から削除される。
+
+    これが無いと、もう使われない IP の記録だけが少しずつ残り続ける。
+    """
     limiter = security_module.SimpleRateLimiter()
     times = iter([0.0, 61.0])
     monkeypatch.setattr(security_module, "monotonic", lambda: next(times))

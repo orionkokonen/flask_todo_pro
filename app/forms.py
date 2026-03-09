@@ -25,9 +25,11 @@ from app.models import Task, User
 
 
 def optional_int(value):
-    """SelectField 用の coerce（＝型変換）関数。
+    """SelectField 用の coerce（＝文字列を別の型へ変える処理）。
 
-    未選択（空文字）のとき int() に変換するとエラーになるので、None を返す。
+    HTML の select は、数字を選んでもまず文字列で送ってくる。
+    ただし未選択時は空文字になるので、そのまま int() にすると落ちる。
+    そこで「空なら None、入っていれば int」にそろえて扱いやすくしている。
     """
     if value in (None, ""):
         return None
@@ -114,7 +116,8 @@ class TaskForm(FlaskForm):
     title = StringField("タイトル", validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("メモ", validators=[Optional(), Length(max=2000)])
 
-    # 自由入力ではなく選択式にし、定義済みステータス以外の値を防ぐ
+    # 自由入力ではなく選択式にし、画面上では定義済みステータスだけ選べるようにする。
+    # ただし POST 改ざんは別問題なので、サーバー側でも routes_tasks.py で再確認する。
     status = SelectField(
         "状態 / 進捗",
         choices=[
@@ -133,7 +136,7 @@ class TaskForm(FlaskForm):
         description="YYYY-MM-DD",
     )
 
-    # coerce（＝型変換）に optional_int を指定し、未選択時は None にする
+    # ブラウザから来る project_id は文字列なので、保存前に int / None へそろえる。
     project_id = SelectField("プロジェクト（任意）", coerce=optional_int, validators=[Optional()])
 
     submit = SubmitField("保存")

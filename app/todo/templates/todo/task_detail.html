@@ -38,7 +38,8 @@
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.board') }}"><i class="bi bi-arrow-left"></i> 戻る</a>
     <a class="btn btn-outline-primary" href="{{ url_for('todo.task_edit', task_id=task.id) }}"><i class="bi bi-pencil"></i> 編集</a>
-    <!-- data-confirm: 確認ダイアログ。hidden_tag(): CSRF トークン。 -->
+    <!-- data-confirm は押し間違い防止の確認ダイアログ。
+         hidden_tag() は「本当にこのサイトのフォームか」を確かめる CSRF トークン。 -->
     <form method="post" action="{{ url_for('todo.task_delete', task_id=task.id) }}" data-confirm="削除します。よろしいですか？">
       {{ delete_form.hidden_tag() }}
       <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> 削除</button>
@@ -148,7 +149,8 @@
 
         <hr>
 
-        {# ステータス変更フォーム: routes_tasks.py の task_move() へ POST する #}
+        {# 状態変更は task_move() に POST する。
+           送信キーを name="status" に統一してあり、画面が増えても追いやすい。 #}
         <h2 class="h6">状態を変更</h2>
         <form method="post" action="{{ url_for('todo.task_move', task_id=task.id) }}" class="row g-2">
           {{ move_form.hidden_tag() }}

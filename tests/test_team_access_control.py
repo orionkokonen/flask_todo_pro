@@ -10,6 +10,7 @@ from app.models import Project, Task
 
 
 def _logout(client) -> None:
+    """テスト中に現在のログイン状態を終わらせる。"""
     client.get("/auth/logout", follow_redirects=False)
 
 
@@ -106,6 +107,11 @@ def test_team_task_create_blocks_outsider_using_project_id_directly(
     create_user,
     login,
 ):
+    """チーム外ユーザーが隠れた project_id を直接 POST しても拒否されることを確認する。
+
+    画面に選択肢が見えていなくても送信データは書き換えられるので、
+    サーバー側の権限チェックが効いているかを確かめる。
+    """
     owner = create_user("hidden_project_owner", "password123")
     create_user("hidden_project_outsider", "password123")
     team = create_team(owner, name="Private Team")

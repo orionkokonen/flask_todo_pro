@@ -55,6 +55,10 @@ def test_login_allows_safe_relative_next_redirect(client, create_user):
 
 
 def test_login_success_writes_audit_log(client, create_user, caplog):
+    """ログイン成功を監査ログに残していることを確認する。
+
+    「誰がいつ入れたか」を後で追えるようにする、安全面の回帰テスト。
+    """
     create_user("audit_success_user", "password123")
     caplog.set_level(logging.INFO)
 
@@ -70,6 +74,10 @@ def test_login_success_writes_audit_log(client, create_user, caplog):
 
 
 def test_login_failure_writes_audit_log(client, create_user, caplog):
+    """ログイン失敗も監査ログに残していることを確認する。
+
+    不正試行の痕跡が残るかを見ておくと、攻撃調査の手がかりを失いにくい。
+    """
     create_user("audit_failed_user", "password123")
     caplog.set_level(logging.WARNING)
 

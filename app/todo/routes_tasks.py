@@ -24,7 +24,11 @@ from app.todo.shared import (
 
 
 def _posted_project_or_abort() -> Project | None:
-    """POST された project_id を明示的に検証し、不正値は早めに弾く。"""
+    """POST された project_id を先に検証する。
+
+    画面のプルダウンには見えていなくても、送信データは開発者ツールなどで書き換えられる。
+    そのため「自分が触れないプロジェクトIDを直接送る」ケースをサーバー側で必ず止める。
+    """
     raw_project_id = request.form.get("project_id")
     if raw_project_id in (None, ""):
         return None
@@ -55,14 +59,16 @@ def task_new():
     preset_status = (request.args.get("status") or "").upper()
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
+    # 送信値の偽装はフォーム検証とは別問題なので、POST が来た時点で先に止める。
     if request.method == "POST":
         _posted_project_or_abort()
 
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
+            # 保存に使うのは form 側で正規化された値なので、ここでも同じ権限確認を通す。
             project = get_or_404(Project, form.project_id.data)
-            # 他ユーザーのプロジェクトへのタスク混入を防ぐため、保存前に権限チェック。
+            # 他ユーザーのプロジェクトへ勝手にタスクを混ぜるのを防ぐ。
             ensure_project_access(project)
 
         task = Task(
@@ -127,6 +133,7 @@ def task_edit(task_id: int):
     if form.validate_on_submit():
         project = None
         if form.project_id.data is not None:
+            # 編集でも「見えていない project_id を直接 POST する」改ざんを防ぐ。
             project = get_or_404(Project, form.project_id.data)
             ensure_project_access(project)
 
@@ -164,17 +171,25 @@ def task_delete(task_id: int):
 @bp.route("/tasks/<int:task_id>/move", methods=["POST"])
 @login_required
 def task_move(task_id: int):
-    """ステータス移動（ボード左右移動・詳細画面の変更に対応）。"""
+    """ステータス移動。
+
+    ボードの左右ボタンと詳細画面のセレクト、どちらから来ても
+    サーバー側では `status` という 1 つのキーだけ受け取る。
+    入力口をそろえると、読み手が追う分岐が減って理解しやすい。
+    """
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
     new_status = (request.form.get("status") or "").upper()
-    # フォーム値の改ざん対策：許可リストでサーバー側検証する。
+    # hidden input や select の値は送信前に書き換えられるので、
+    # 画面で選択式にしていてもサーバー側で「この値だけ許可」と再確認する。
     if new_status not in Task.VALID_STATUSES:
         abort(400)
 
     task.status = new_status
     db.session.commit()
+    # 元の画面へ戻すと操作感が自然。
+    # 参照元が取れない場合だけ安全な既定値としてボードへ戻す。
     return redirect(request.referrer or url_for("todo.board"))
 
 

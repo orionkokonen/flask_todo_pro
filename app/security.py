@@ -31,10 +31,11 @@ class SimpleRateLimiter:
         self._lock = Lock()
 
     def _prune(self, bucket: str, now: float, window_seconds: int) -> deque[float] | None:
-        """時間枠外（期限切れ）の古い記録を先頭から削除し、残りを返す。
+        """時間枠外（期限切れ）の古い記録を捨てる。
 
-        deque は時系列順なので先頭から消すだけで済む。
-        全件消えたバケットは None を返し、呼び出し元でメモリを解放する。
+        記録は「古い順」に並んでいるので、先頭から見ればよい。
+        使い終わったバケットまで辞書に残すと、アクセスが終わった IP の情報が
+        少しずつ溜まってしまうため、空になったらここで片づける。
         """
         entries = self._entries.get(bucket)
         if entries is None:
@@ -59,13 +60,14 @@ class SimpleRateLimiter:
         with self._lock:
             now = monotonic()
             entries = self._prune(bucket, now, window_seconds)
+            # 空バケットを残さないよう、念のためここでも pop(None) しておく。
             if not entries:
                 self._entries.pop(bucket, None)
                 return True, 0
             if len(entries) < limit:
                 return True, 0
 
-            # 最古の記録がウィンドウから外れるまでの残り秒数を計算
+            # 一番古い失敗が時間枠から消えれば、次の試行を許可できる。
             retry_after = max(1, ceil(window_seconds - (now - entries[0])))
             return False, retry_after
 
@@ -79,6 +81,7 @@ class SimpleRateLimiter:
             now = monotonic()
             entries = self._prune(bucket, now, window_seconds)
             if entries is None:
+                # 初回失敗時だけ空の入れ物を作り、以後は同じ deque に時刻を積む。
                 entries = self._entries.setdefault(bucket, deque())
             entries.append(now)
 

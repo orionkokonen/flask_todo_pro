@@ -41,7 +41,9 @@ def board():
     team_ids = get_accessible_team_ids()
 
     # --- 2. アクセス可能なプロジェクトとタスクを DB から取得 ---
-    # selectinload: 関連テーブル（team）を別クエリで一括ロードし N+1 問題を防ぐ。
+    # selectinload:
+    # 各 project ごとに team を取りに行くと問い合わせ回数が増えるので、
+    # 先にまとめて読んで「1件ずつ追加問い合わせ」が起きるのを防ぐ。
     projects = (
         get_accessible_projects_query(team_ids)
         .options(selectinload(Project.team))
@@ -53,8 +55,10 @@ def board():
         selectinload(Task.project).selectinload(Project.team)
     )
 
-    # スコープフィルター: 「個人」「チーム」「すべて」の 3 種で表示範囲を切り替える。
-    # unassigned はプロジェクト未所属かつ自分が作成したタスクで、個人スコープ扱いとする。
+    # スコープフィルター:
+    # 「個人」「チーム」「すべて」で見せる範囲を切り替える。
+    # db.false() は SQL の「常に偽」を表す書き方で、Python の False を直接渡すより意図が伝わりやすい。
+    # unassigned はプロジェクト未所属かつ自分が作成したタスクで、個人スコープ扱いにする。
     personal_projects = Project.team_id.is_(None) & (Project.owner_id == current_user.id)
     team_projects = Project.team_id.in_(team_ids) if team_ids else db.false()
     unassigned = (Task.project_id.is_(None) & (Task.created_by_id == current_user.id))
@@ -69,7 +73,9 @@ def board():
     if project_id:
         base = base.filter(Task.project_id == project_id)
 
-    # ilike（大文字小文字を区別しない LIKE 検索）でタイトル・説明文を横断検索する。
+    # ilike:
+    # 英字の大文字・小文字を気にせず部分一致検索する。
+    # 例: "task" でも "Task" でも同じように見つけられる。
     if q:
         like = f"%{q}%"
         base = base.filter(Task.title.ilike(like) | Task.description.ilike(like))
@@ -77,7 +83,8 @@ def board():
     if not show_done:
         base = base.filter(Task.status != Task.STATUS_DONE)
 
-    # 締切日が近いタスクを上に、締切未設定は末尾に、同条件は更新が新しい順に並べる。
+    # 並び順は「締切が近いもの優先」。
+    # 期限なしは後ろへ回し、同じ条件なら最近更新したものを先に見せる。
     tasks = base.order_by(
         Task.due_date.is_(None),
         Task.due_date.asc(),
@@ -90,7 +97,7 @@ def board():
     def by_status(status: str):
         return [task for task in tasks if task.status == status]
 
-    # カンバンボードの 4 列分のデータを辞書で作成
+    # テンプレートが列ごとに描画しやすいよう、ステータス名 → タスク一覧の形にする。
     columns = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),

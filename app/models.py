@@ -17,10 +17,11 @@ def utc_now() -> datetime:
     """UTC（世界標準時）の現在時刻を返す。
 
     Python 3.12 で datetime.utcnow() が非推奨になったため、
-    now(utc) で取得してタイムゾーン情報を外す（DB カラムとの互換性のため）。
+    まず「UTC だと分かる時刻」を作り、その後で DB 保存用の形に整える。
     """
-    # SQLite では naive datetime を前提に扱うため、このアプリでは
-    # 「naive datetime は UTC」と決めて aware UTC を外して保存する。
+    # SQLite では timezone 付き日時の扱いが単純ではないため、
+    # このアプリでは「timezone 情報なし = UTC」と決めてそろえている。
+    # 方針を決めておくと、表示や比較で時差の混乱が起きにくい。
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
@@ -34,8 +35,10 @@ class Team(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
-    # cascade="all, delete-orphan": 親（チーム）を削除すると子も自動で連鎖削除される。
-    # lazy="dynamic": team.members でアクセスしたとき全件ロードせずクエリとして扱える。
+    # cascade="all, delete-orphan":
+    # チームを消したら、そのチーム専用のメンバー情報やプロジェクトも一緒に片づける。
+    # lazy="dynamic":
+    # team.members を「すぐ全部読むリスト」ではなく「あとで絞り込める問い合わせ」として扱う。
     members = db.relationship(
         "TeamMember",
         back_populates="team",
@@ -125,6 +128,7 @@ class User(UserMixin, db.Model):
 # Flask-Login がセッション（ログイン状態）からユーザーを復元する際に呼ばれるコールバック
 @login.user_loader
 def load_user(user_id: str):
+    """セッションに保存された user_id から User を取り出す。"""
     try:
         parsed_user_id = int(user_id)
     except (TypeError, ValueError):
@@ -178,7 +182,7 @@ class Project(db.Model):
             return False
         if self.is_personal:
             return self.owner_id == user.id
-        # team project
+        # チーム所属プロジェクトは「チームの一員か」で判定する。
         return TeamMember.is_member(user.id, self.team_id)
 
     def __repr__(self) -> str:
@@ -188,13 +192,13 @@ class Project(db.Model):
 class Task(db.Model):
     __tablename__ = "task"
 
-    # ステータスを定数にまとめ、コード中に文字列を直書き（ハードコード）するのを防ぐ
+    # ステータス名を定数にまとめると、表記ゆれや打ち間違いを防ぎやすい。
     STATUS_TODO = "TODO"
     STATUS_DOING = "DOING"
     STATUS_DONE = "DONE"
     STATUS_WISH = "WISH"  # Wishリスト用
 
-    # ステータス変更時に「この中にあるか？」で入力チェック（バリデーション）する
+    # フォームや API から来た値がこの一覧にあるかを見て、想定外の状態を防ぐ。
     VALID_STATUSES = (STATUS_TODO, STATUS_DOING, STATUS_DONE, STATUS_WISH)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -206,7 +210,7 @@ class Task(db.Model):
 
     due_date = db.Column(db.Date, nullable=True, index=True)
 
-    # project_id が NULL のタスクは「プロジェクト未所属の個人タスク」として扱う
+    # project_id が空なら「どのプロジェクトにも属していない個人タスク」として扱う。
     project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=True, index=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
 
@@ -217,8 +221,8 @@ class Task(db.Model):
     project = db.relationship("Project", back_populates="tasks")
     created_by = db.relationship("User", back_populates="tasks_created")
 
-    # lazy="dynamic": task.subtasks はリストではなくクエリを返すので、
-    # .count() や .filter() で必要な分だけ DB から取得できる。
+    # サブタスクも dynamic にしておくと、
+    # 「件数だけ知りたい」「完了済みだけ数えたい」を必要な SQL だけで処理できる。
     subtasks = db.relationship(
         "SubTask",
         back_populates="task",
@@ -242,7 +246,10 @@ class Task(db.Model):
         return (self.due_date - date.today()).days
 
     def due_badge(self, soon_days: int = 3) -> dict:
-        """締切の状態を辞書で返す。テンプレートで due.is_overdue 等として参照できる。"""
+        """締切の見た目判定に必要な情報を、テンプレート向けにまとめて返す。
+
+        画面側に日付計算を書かずに済むので、HTML を読む人は「表示」に集中できる。
+        """
         if not self.due_date:
             return {"days": None, "is_overdue": False, "is_today": False, "is_soon": False}
         days = (self.due_date - date.today()).days

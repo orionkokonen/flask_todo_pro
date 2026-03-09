@@ -63,3 +63,24 @@
 
 - 画面ごとに分散していたインラインスタイル依存を減らし、共通 CSS に寄せることで UI 調整時の見落としや差分の散在を起こしにくい構成に改善。
 - UI 2.0 への更新後も既存挙動が崩れないことを確認するため、回帰確認として `pytest` を実行し、既存テスト 43 件の通過を確認。
+
+## [2026-03-09]
+
+### Fixed
+
+- `app/security.py` の `_prune()` で期限切れ後に空になったレート制限バケットを削除し、長時間稼働時に使われなくなった IP 単位の記録が残り続けにくいよう改善。
+- `app/__init__.py` の CSP から `img-src 'self' data:` の `data:` を外し、未使用の許可を残さない構成に見直し。
+- `app/todo/routes_tasks.py` で細工した `project_id` の POST を作成前に検証し、アクセス権のないチームプロジェクトを直接紐づけられないよう補強。
+- `app/todo/routes_tasks.py` のステータス更新入力を `status` に統一し、旧 `to` フォールバックを廃止。
+- `app/todo/routes_board.py` と `app/todo/shared.py` の偽条件フィルタを `filter(False)` から `db.false()` に統一。
+
+### Changed
+
+- `app/auth/routes.py` にログイン成功 / 失敗の監査ログを追加し、フラッシュメッセージ表記も Unicode エスケープではなく通常の日本語文字列へ整理。
+- `app/forms.py` の `optional_int()` から不要な `"None"` 特別扱いを削除。
+- `app/models.py` の `utc_now()` に、SQLite 互換のため naive UTC を保存している理由コメントを追加。
+
+### Added
+
+- `tests/test_rate_limit.py` / `tests/test_auth_security.py` / `tests/test_task_crud.py` / `tests/test_team_access_control.py` に、空バケット掃除・認証監査ログ・旧 `to` パラメータ拒否・チーム外 `project_id` 直 POST 拒否のテストを追加。
+- 回帰確認として `pytest` を実行し、48 件のテスト通過を確認。

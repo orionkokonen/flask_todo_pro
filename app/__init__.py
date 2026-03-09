@@ -34,6 +34,7 @@ login.login_view = "auth.login"
 # 全て 'self'（=自分のドメインだけ）に絞れている。
 # script-src に 'unsafe-inline' がないのは、インライン JS を app.js へ移行したため。
 # style-src の 'unsafe-inline' は base.html のインライン style 用に残してある。
+# img-src から data: を外したのは、使っていない許可を残さず読み込み先を狭めるため。
 CONTENT_SECURITY_POLICY = "; ".join(
     [
         "default-src 'self'",        # 指定がないものは自ドメインのみ許可
@@ -165,7 +166,8 @@ def create_app(config_overrides: dict[str, Any] | None = None):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
 
-        # HSTS は HTTPS 本番環境でのみ付ける。HTTP 開発中に出すとブラウザが壊れる。
+        # HSTS は「このサイトには今後も HTTPS で来て」とブラウザに覚えさせる仕組み。
+        # 開発中の HTTP 環境で出すと動作確認しづらくなるので、本番相当の時だけ付ける。
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 

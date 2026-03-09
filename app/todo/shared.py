@@ -47,6 +47,8 @@ def get_accessible_projects_query(team_ids: list[int] | None = None):
     team = (
         Project.query.filter(Project.team_id.in_(team_ids))
         if team_ids
+        # チーム未所属なら「チーム案件は 0 件」を SQL として明示する。
+        # db.false() にしておくと、クエリの意図が読みやすい。
         else Project.query.filter(db.false())
     )
     return personal.union(team)
@@ -83,7 +85,10 @@ def ensure_task_access(task: Task) -> None:
 
 
 def build_project_choices(team_ids: list[int] | None = None) -> list[tuple[int, str]]:
-    """フォームで選択できるプロジェクト一覧をラベル付きで返す。"""
+    """フォームで選択できるプロジェクト一覧をラベル付きで返す。
+
+    ラベルに「個人 / チーム」を含めるのは、同名プロジェクトがあっても見分けやすくするため。
+    """
     projects = get_accessible_projects_query(team_ids).order_by(Project.name.asc()).all()
     choices = []
     for project in projects:
@@ -125,9 +130,8 @@ def load_subtask_progress_map(task_ids: list[int]) -> dict[int, dict[str, int]]:
     if not task_ids:
         return progress_by_task_id
 
-    # SQL の GROUP BY で task_id ごとにサブタスクの合計数・完了数を集計する。
-    # coalesce: SUM が NULL（完了 0 件）のとき 0 に置き換える SQL 関数。
-    # case: 条件分岐（done=True なら 1、それ以外は 0）を SQL 内で行う。
+    # DB 側で task_id ごとに件数をまとめる。
+    # coalesce は「値が無いなら 0 にする」、case は「条件に応じて 1 / 0 を返す」ための SQL 機能。
     progress_rows = (
         db.session.query(
             SubTask.task_id,
