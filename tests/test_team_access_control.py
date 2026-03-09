@@ -144,7 +144,10 @@ def test_team_member_add_shows_same_generic_error_for_missing_and_existing_user(
     create_user,
     login,
 ):
-    """ユーザー未登録と既存メンバーの両方で同じメッセージを返し、列挙の手がかりを減らす。"""
+    """ユーザー未登録と既存メンバーの両方で同じメッセージを返し、列挙の手がかりを減らす。
+
+    理由が違っても画面の見え方を同じにしておくと、外からの推測材料を増やしにくい。
+    """
     owner = create_user("team_manage_owner", "password123")
     member = create_user("team_manage_member", "password123")
     team = create_team(owner, members=[member], name="Ops Team")
@@ -152,6 +155,7 @@ def test_team_member_add_shows_same_generic_error_for_missing_and_existing_user(
     login_response = login("team_manage_owner", "password123")
     assert login_response.status_code == 302
 
+    # 「存在しない」と「既にいる」の 2 パターンを、同じ画面文言で比較する。
     missing_response = client.post(
         f"/todo/teams/{team.id}",
         data={"username": "missing_account"},

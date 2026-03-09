@@ -3,6 +3,7 @@
 全操作に共通する安全策:
 - @login_required  → 未ログインユーザーはログイン画面へリダイレクト（本人確認）
 - ensure_task_access → 他人のタスクは 403 Forbidden で拒否（権限チェック）
+- rollback_session → 保存失敗後の DB セッションをきれいに戻す（次の操作を巻き添えにしない）
 """
 from __future__ import annotations
 
@@ -83,9 +84,12 @@ def task_new():
         )
         try:
             db.session.add(task)
+            # commit() は本当に保存を確定する最後の壁。
+            # ここで失敗しても次の保存が詰まらないよう rollback_session() で整える。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("task create")
+            # 同じフォームをそのまま返すと、何を入力していたかを見失いにくい。
             flash("タスクを追加できませんでした。時間を置いて再試行してください。", "danger")
             return render_template(
                 "todo/task_form.html",
@@ -157,6 +161,8 @@ def task_edit(task_id: int):
         task.project = project
 
         try:
+            # 編集は既存オブジェクトを書き換えたあとで確定する。
+            # 失敗時は rollback() で「途中だけ書き換わった風」に見える状態を戻す。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("task edit")
@@ -187,6 +193,7 @@ def task_delete(task_id: int):
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
     try:
+        # delete() は「削除予定」にするだけで、実際の反映は commit() で確定する。
         db.session.delete(task)
         db.session.commit()
     except SQLAlchemyError:
@@ -217,6 +224,7 @@ def task_move(task_id: int):
 
     task.status = new_status
     try:
+        # 移動ボタン 1 回でも保存失敗は起こりうるので、軽い更新でも例外処理を入れておく。
         db.session.commit()
     except SQLAlchemyError:
         rollback_session("task move")
@@ -252,7 +260,11 @@ def subtask_add(task_id: int):
 @bp.route("/subtasks/<int:subtask_id>/toggle", methods=["POST"])
 @login_required
 def subtask_toggle(subtask_id: int):
-    """サブタスクの完了状態を切り替える（完了↔未完了）。"""
+    """サブタスクの完了状態を切り替える（完了↔未完了）。
+
+    チェック 1 回の小さな更新でも DB 書き込みであることは同じなので、
+    失敗時の後片づけは省略しない。
+    """
     subtask = get_or_404(SubTask, subtask_id)
     task = subtask.task
     ensure_task_access(task)

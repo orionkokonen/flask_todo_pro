@@ -37,6 +37,10 @@ def optional_int(value):
 
 
 class RegistrationForm(FlaskForm):
+    """新規登録フォーム。
+
+    画面入力の確認だけでなく、「説明しすぎないエラーメッセージ」にする役目も持つ。
+    """
     username = StringField(
         "ユーザー名",
         validators=[DataRequired(), Length(min=1, max=64)],
@@ -56,14 +60,17 @@ class RegistrationForm(FlaskForm):
         """ユーザー名の重複を DB で事前チェックする。
 
         validate_<フィールド名> というメソッド名は WTForms が自動で呼ぶ規約。
-        DB の unique 制約だけだと生のエラー画面になるため、ここで先に防ぐ。
-        ただし存在有無をそのまま返すと列挙の手がかりになるため、文言は汎用化する。
+        DB の unique 制約だけに任せると、保存時に固い例外が出て読みづらくなりやすい。
+        ここで先に止めつつ、存在有無をそのまま言わない文言にしている。
         """
+        # 前後の空白だけ違う入力を別物として扱わないため、先に trim（余分な空白除去）する。
         normalized_username = (username.data or "").strip()
         username.data = normalized_username
         if not normalized_username:
             raise ValidationError("ユーザー名を入力してください。")
         user = User.query.filter_by(username=normalized_username).first()
+        # 「既に使われています」と断言すると、登録済みユーザーの手がかりになる。
+        # そのため、画面には少し広めの表現だけ返す。
         if user:
             raise ValidationError("登録内容を確認して、別のユーザー名で再試行してください。")
 
@@ -111,6 +118,7 @@ class RegistrationForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
+    """ログインフォーム。"""
     username = StringField("ユーザー名", validators=[DataRequired()])
     password = PasswordField("パスワード", validators=[DataRequired()])
     remember_me = BooleanField("ログイン状態を保持する")
@@ -118,6 +126,7 @@ class LoginForm(FlaskForm):
 
 
 class TaskForm(FlaskForm):
+    """タスク作成・編集で共通利用するフォーム。"""
     title = StringField("タイトル", validators=[DataRequired(), Length(max=160)])
     description = TextAreaField("メモ", validators=[Optional(), Length(max=2000)])
 
@@ -153,6 +162,7 @@ class TaskForm(FlaskForm):
 
 
 class ProjectForm(FlaskForm):
+    """プロジェクト作成フォーム。"""
     name = StringField("プロジェクト名", validators=[DataRequired(), Length(max=120)])
     description = TextAreaField("説明", validators=[Optional(), Length(max=2000)])
 
@@ -167,16 +177,19 @@ class ProjectForm(FlaskForm):
 
 
 class TeamForm(FlaskForm):
+    """チーム作成フォーム。"""
     name = StringField("チーム名", validators=[DataRequired(), Length(max=80)])
     submit = SubmitField("作成")
 
 
 class AddMemberForm(FlaskForm):
+    """チームへ既存ユーザーを追加するときのフォーム。"""
     username = StringField("追加するユーザー名", validators=[DataRequired(), Length(max=64)])
     submit = SubmitField("追加")
 
 
 class SubTaskForm(FlaskForm):
+    """サブタスク追加フォーム。"""
     title = StringField("サブタスク", validators=[DataRequired(), Length(max=160)])
     submit = SubmitField("追加")
 

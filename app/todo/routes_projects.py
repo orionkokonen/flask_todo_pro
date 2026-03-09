@@ -26,7 +26,11 @@ from app.todo.shared import (
 @bp.route("/projects", methods=["GET", "POST"])
 @login_required
 def projects():
-    """プロジェクト一覧の表示（GET）と新規作成（POST）を同一 URL で扱う。"""
+    """プロジェクト一覧の表示（GET）と新規作成（POST）を同一 URL で扱う。
+
+    個人用とチーム共有の両方を 1 画面で扱うので、
+    「見えてよい範囲」と「作ってよい範囲」を分けて確認する。
+    """
     form = ProjectForm()
     delete_form = EmptyForm()  # 各プロジェクト横の削除ボタン用 CSRF トークン
 
@@ -36,6 +40,8 @@ def projects():
         if team_ids
         else []
     )
+    # form の選択肢は毎回サーバー側で組み直す。
+    # こうしておくと、他チームの ID を送られても「そもそも選べない値」として扱いやすい。
     form.team_id.choices = [(0, "（個人）")] + [(team.id, team.name) for team in teams]
     projs = get_accessible_projects_query(team_ids).order_by(Project.created_at.desc()).all()
 
@@ -46,7 +52,8 @@ def projects():
         else:
             team = get_or_404(Team, team_id)
             # チームプロジェクトを作成できるのはチームメンバーのみ。
-            # フォームの team_id を直接書き換えて他チームに紐づけるのを防ぐ。
+            # フォームの team_id は開発者ツールなどで直接書き換えられるので、
+            # 「画面で選べたか」ではなく「今の人に権限があるか」で止める。
             if not TeamMember.is_member(current_user.id, team.id):
                 abort(403)
 
@@ -58,6 +65,8 @@ def projects():
         )
         try:
             db.session.add(project)
+            # 保存に失敗したときは rollback_session() が後片づけを担当する。
+            # 画面は壊さず、一覧を見たままやり直せる形で返す。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("project create")
@@ -91,8 +100,9 @@ def project_delete(project_id: int):
     # ① 閲覧権限チェック
     ensure_project_access(project)
 
-    # ② 削除権限チェック（閲覧できても削除できるとは限らない）
+    # ② 削除権限チェック（見られる人全員が削除できるわけではない）
     if project.is_personal and project.owner_id != current_user.id:
+        # 403 を返すだけでなく、なぜ止めたかはログに残して後で追えるようにする。
         current_app.logger.warning(
             "project delete forbidden: user_id=%s project_id=%s reason=not_personal_owner",
             current_user.id,
@@ -113,6 +123,7 @@ def project_delete(project_id: int):
         db.session.commit()
     except SQLAlchemyError:
         rollback_session("project delete")
+        # 削除失敗時は一覧へ戻し、再読み込みや再操作がしやすい導線にしている。
         flash("プロジェクト削除に失敗しました。時間を置いて再試行してください。", "danger")
         return redirect(url_for("todo.projects"))
     flash("プロジェクトを削除しました。")

@@ -206,7 +206,10 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
     login,
     monkeypatch,
 ):
-    """タスク保存失敗時に rollback し、その後の書き込みで PendingRollbackError を残さない。"""
+    """タスク保存失敗時に rollback し、その後の書き込みで PendingRollbackError を残さない。
+
+    追加処理そのものより、「失敗後に次の保存まで巻き込まないこと」を主に確かめる。
+    """
     create_user("task_commit_user", "password123")
 
     login_response = login("task_commit_user", "password123")
@@ -218,12 +221,14 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
     state = {"failed_once": False}
 
     def flaky_commit():
+        # 最初の 1 回だけ失敗させることで、rollback 後の回復可否まで 1 本で見られる。
         if not state["failed_once"]:
             state["failed_once"] = True
             raise SQLAlchemyError("forced failure")
         return original_commit()
 
     def tracking_rollback():
+        # rollback() 呼び出しの有無だけ観測し、実際の後片づけは元の処理に任せる。
         nonlocal rollback_called
         rollback_called = True
         return original_rollback()
@@ -252,6 +257,7 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
     with app.app_context():
         assert Task.query.filter_by(title="Broken Task").first() is None
 
+    # 2 回目の保存が成功すれば、失敗したセッション状態を引きずっていないと分かる。
     recovery_response = client.post(
         "/todo/tasks/new",
         data={

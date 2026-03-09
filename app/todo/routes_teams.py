@@ -1,7 +1,8 @@
 """チームの一覧・作成・詳細・メンバー管理ルート（/todo/teams）。
 
 チーム = 複数ユーザーがプロジェクトを共有する単位。
-メンバーの追加・削除はチームオーナー（作成者）のみ実行できる。
+この実装では、メンバー追加は既存メンバーなら実行でき、
+メンバー削除はチームオーナー（作成者）のみ実行できる。
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ def teams():
     """チーム一覧の表示（GET）と新規チームの作成（POST）を同一 URL で扱う。"""
     form = TeamForm()
     team_ids = get_accessible_team_ids()
+    # 自分が所属していないチームまで一覧へ出さないよう、最初に見える範囲を絞る。
     teams_list = (
         Team.query.filter(Team.id.in_(team_ids)).order_by(Team.created_at.desc()).all()
         if team_ids
@@ -34,12 +36,13 @@ def teams():
         try:
             db.session.add(team)
             # flush(): commit せずに DB へ仮書き込みし、team.id（自動採番）を確定させる。
-            # この id がないと TeamMember の外部キー（team_id）を設定できない。
+            # まだ本保存ではないが、この id がないと「作成者を owner として追加」が書けない。
             db.session.flush()
             db.session.add(TeamMember(team_id=team.id, user_id=current_user.id, role="owner"))
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("team create")
+            # 一覧画面を保ったまま返すと、作成し直す文脈を失いにくい。
             flash("チームを作成できませんでした。時間を置いて再試行してください。", "danger")
             return render_template("todo/teams.html", teams=teams_list, form=form)
         flash("チームを作成しました。")
@@ -51,7 +54,10 @@ def teams():
 @bp.route("/teams/<int:team_id>", methods=["GET", "POST"])
 @login_required
 def team_detail(team_id: int):
-    """チーム詳細画面。メンバー一覧の表示と、新メンバーの追加（POST）を扱う。"""
+    """チーム詳細画面。
+
+    閲覧はチームメンバーのみ。ここでは一覧表示とメンバー追加を扱う。
+    """
     team = get_or_404(Team, team_id)
     # チームメンバー以外はこの画面を見られない（認可チェック）
     if not TeamMember.is_member(current_user.id, team.id):
@@ -71,8 +77,11 @@ def team_detail(team_id: int):
     if form.validate_on_submit():
         username = form.username.data.strip()
         user = User.query.filter_by(username=username).first()
+        # 画面に出す文言は 1 種類にそろえる。
+        # 「存在しないユーザー」と「既にいるユーザー」を見分けさせないため。
         generic_error = "メンバーを追加できませんでした。入力内容を確認して再試行してください。"
         if not user:
+            # 理由は UI ではなくログだけに残す。運用者は追えるが、利用者へは出しすぎない。
             current_app.logger.info(
                 "team member add rejected: actor_id=%s team_id=%s username=%s reason=user_not_found",
                 current_user.id,
@@ -97,6 +106,7 @@ def team_detail(team_id: int):
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("team member add")
+            # 保存だけ失敗した場合は、同じ詳細画面に戻して「誰のチームだったか」を保つ。
             flash("メンバー追加に失敗しました。時間を置いて再試行してください。", "danger")
             return render_template(
                 "todo/team_detail.html",
@@ -136,7 +146,8 @@ def team_member_remove(team_id: int, user_id: int):
     if team_member.role == "owner":
         abort(400)
 
-    # is_member は「チーム内か」だけを見る。「削除できるか」は owner かどうかで別途判定。
+    # is_member() は「中にいるか」しか見ない。
+    # 「人を外してよいか」は管理権限の話なので、owner かどうかを別に確認する。
     if current_user.id != team.owner_id:
         abort(403)
 

@@ -62,7 +62,8 @@ def _render_auth_template(
 def _rate_limited_response(template_name: str, form, retry_after: int):
     """短時間に何度もリクエストが来たとき、429（Too Many Requests）エラーを返す。
 
-    HTTPステータス429＝「リクエストが多すぎる」ことを示す標準のエラーコード。
+    HTTPステータス429 は「短時間に来すぎたので少し待って」という意味。
+    エラー画面ではなく通常のフォーム画面を返しつつ、待ち時間の目安もヘッダーへ載せる。
     """
     flash(
         "試行回数が多すぎます。"
@@ -79,8 +80,13 @@ def _rate_limited_response(template_name: str, form, retry_after: int):
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
-    """ユーザー登録ページ。新しいアカウントを作成する。"""
+    """ユーザー登録ページ。
+
+    入力チェック、レート制限、保存失敗時の後片づけまでを 1 つの流れとして扱う。
+    """
     form = RegistrationForm()
+    # bucket は「この IP の登録試行回数」を数えるための名前。
+    # 文字列の中身は自由だが、用途ごとに分けると login と register を別々に数えられる。
     bucket = f"register:{_client_ip()}"
 
     if request.method == "POST":
@@ -98,9 +104,13 @@ def register():
         user.set_password(form.password.data)
         try:
             db.session.add(user)
+            # commit() はここまで積んだ変更を本当に DB へ確定する場所。
+            # 失敗しやすい境目なので、try/except で囲って後片づけを明示する。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("user registration")
+            # 画面には原因を細かく出さず、入力見直しを促す文言だけ返す。
+            # 詳細は rollback_session() 側のログへ残す。
             flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
             return _render_auth_template("auth/register.html", form)
         # 成功したら同じ IP の失敗カウントを消し、正規ユーザーを巻き込まないようにする。
@@ -122,7 +132,11 @@ def register():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    """ログインページ。ユーザー名とパスワードで本人確認する。"""
+    """ログインページ。
+
+    「その人本人か」を確認する入口で、成功時はセッションを作り、
+    失敗時は回数を記録して総当たり攻撃を遅くする。
+    """
     form = LoginForm()
     bucket = f"login:{_client_ip()}"
 
@@ -137,6 +151,8 @@ def login():
             return _rate_limited_response("auth/login.html", form, retry_after)
 
     if form.validate_on_submit():
+        # まずユーザー名で探し、見つかったときだけパスワード照合へ進む。
+        # ただし画面には「どちらが違ったか」は出さず、推測材料を増やさない。
         user = User.query.filter_by(username=form.username.data).first()
         if user and user.check_password(form.password.data):
             # 成功した時点で失敗回数を消し、次回ログイン時に影響が残らないようにする。
@@ -166,7 +182,8 @@ def login():
             form.username.data,
             _client_ip(),
         )
-        # ユーザー名・パスワードのどちらが間違っているかは教えない（セキュリティ上の配慮）。
+        # 「ユーザー名がない」「パスワードだけ違う」を出し分けると、
+        # 攻撃者に登録済みアカウントを推測されやすくなるので文言はまとめる。
         flash("ログインに失敗しました。入力内容を確認してください。")
     return _render_auth_template("auth/login.html", form)
 

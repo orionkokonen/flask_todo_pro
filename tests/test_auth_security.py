@@ -262,7 +262,10 @@ def test_register_stores_password_hash_with_scrypt(app, client):
 
 
 def test_register_duplicate_username_shows_generic_message(client, create_user):
-    """重複ユーザー名でも存在有無を直接示さないメッセージを返す。"""
+    """重複ユーザー名でも存在有無を直接示さないメッセージを返す。
+
+    画面上の言い方が変わると列挙対策が崩れるため、文言も回帰テストで固定する。
+    """
     create_user("duplicated_user", "password123")
 
     response = client.post(
@@ -287,19 +290,24 @@ def test_register_commit_error_rolls_back_and_shows_generic_flash(
     client,
     monkeypatch,
 ):
-    """登録時の DB 書き込み失敗で rollback し、次の処理へ壊れたセッションを残さない。"""
+    """登録時の DB 書き込み失敗で rollback し、次の処理へ壊れたセッションを残さない。
+
+    monkeypatch で commit() を 1 回だけ失敗させ、失敗後に回復できるかを見る。
+    """
     rollback_called = False
     original_commit = db.session.commit
     original_rollback = db.session.rollback
     state = {"failed_once": False}
 
     def flaky_commit():
+        # 1 回目だけわざと失敗させる。2 回目以降は本物の commit() を使う。
         if not state["failed_once"]:
             state["failed_once"] = True
             raise SQLAlchemyError("forced failure")
         return original_commit()
 
     def tracking_rollback():
+        # rollback() が本当に呼ばれたかを記録しつつ、中身は元の実装へ流す。
         nonlocal rollback_called
         rollback_called = True
         return original_rollback()
@@ -326,6 +334,7 @@ def test_register_commit_error_rolls_back_and_shows_generic_flash(
     with app.app_context():
         assert User.query.filter_by(username="commit_error_user").first() is None
 
+        # 失敗後にも普通の保存ができれば、「PendingRollbackError を残していない」と判断できる。
         recovery_user = User(username="post_error_recovery_user")
         recovery_user.set_password("StrongPass123")
         db.session.add(recovery_user)

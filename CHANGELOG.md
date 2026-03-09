@@ -73,6 +73,8 @@
 - `app/todo/routes_tasks.py` で細工した `project_id` の POST を作成前に検証し、アクセス権のないチームプロジェクトを直接紐づけられないよう補強。
 - `app/todo/routes_tasks.py` のステータス更新入力を `status` に統一し、旧 `to` フォールバックを廃止。
 - `app/todo/routes_board.py` と `app/todo/shared.py` の偽条件フィルタを `filter(False)` から `db.false()` に統一。
+- `app/auth/routes.py` / `app/todo/routes_projects.py` / `app/todo/routes_tasks.py` / `app/todo/routes_teams.py` の主要な更新系ルートで、`db.session.commit()` 失敗時に `rollback()` してから復帰するようにし、壊れたセッション状態を次のリクエストへ持ち越しにくくした。
+- 認証失敗、登録時の重複ユーザー名、チームメンバー追加失敗の UI メッセージを汎用化し、ユーザー存在有無の手がかりを返しにくい構成へ見直し。
 
 ### Changed
 
@@ -84,3 +86,9 @@
 
 - `tests/test_rate_limit.py` / `tests/test_auth_security.py` / `tests/test_task_crud.py` / `tests/test_team_access_control.py` に、空バケット掃除・認証監査ログ・旧 `to` パラメータ拒否・チーム外 `project_id` 直 POST 拒否のテストを追加。
 - 回帰確認として `pytest` を実行し、48 件のテスト通過を確認。
+- `app/db_utils.py` を新規追加し、DB 書き込み失敗時の `rollback()` と例外ログ出力を共通化。
+- `tests/test_auth_security.py` / `tests/test_task_crud.py` / `tests/test_team_access_control.py` に、登録・タスク作成の commit 失敗時 rollback と、列挙対策メッセージの回帰テストを追加。
+
+### Docs
+
+- `README.md` にアーキテクチャ図、レイヤごとの責務、セキュリティ設計の要点を追記し、面接時に全体像と防御方針を説明しやすい構成へ更新。
