@@ -5,10 +5,12 @@
 """
 from __future__ import annotations
 
-from flask import abort, flash, redirect, render_template, url_for
+from flask import abort, current_app, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
+from app.db_utils import rollback_session
 from app.forms import AddMemberForm, EmptyForm, TeamForm
 from app.models import Team, TeamMember, User
 from app.todo import bp
@@ -29,12 +31,17 @@ def teams():
 
     if form.validate_on_submit():
         team = Team(name=form.name.data, owner_id=current_user.id)
-        db.session.add(team)
-        # flush(): commit せずに DB へ仮書き込みし、team.id（自動採番）を確定させる。
-        # この id がないと TeamMember の外部キー（team_id）を設定できない。
-        db.session.flush()
-        db.session.add(TeamMember(team_id=team.id, user_id=current_user.id, role="owner"))
-        db.session.commit()
+        try:
+            db.session.add(team)
+            # flush(): commit せずに DB へ仮書き込みし、team.id（自動採番）を確定させる。
+            # この id がないと TeamMember の外部キー（team_id）を設定できない。
+            db.session.flush()
+            db.session.add(TeamMember(team_id=team.id, user_id=current_user.id, role="owner"))
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("team create")
+            flash("チームを作成できませんでした。時間を置いて再試行してください。", "danger")
+            return render_template("todo/teams.html", teams=teams_list, form=form)
         flash("チームを作成しました。")
         return redirect(url_for("todo.team_detail", team_id=team.id))
 
@@ -64,16 +71,40 @@ def team_detail(team_id: int):
     if form.validate_on_submit():
         username = form.username.data.strip()
         user = User.query.filter_by(username=username).first()
+        generic_error = "メンバーを追加できませんでした。入力内容を確認して再試行してください。"
         if not user:
-            flash("そのユーザー名は見つかりませんでした。")
+            current_app.logger.info(
+                "team member add rejected: actor_id=%s team_id=%s username=%s reason=user_not_found",
+                current_user.id,
+                team.id,
+                username,
+            )
+            flash(generic_error, "warning")
             return redirect(url_for("todo.team_detail", team_id=team.id))
 
         if TeamMember.is_member(user.id, team.id):
-            flash("既にメンバーです。")
+            current_app.logger.info(
+                "team member add rejected: actor_id=%s team_id=%s username=%s reason=already_member",
+                current_user.id,
+                team.id,
+                username,
+            )
+            flash(generic_error, "warning")
             return redirect(url_for("todo.team_detail", team_id=team.id))
 
-        db.session.add(TeamMember(team_id=team.id, user_id=user.id, role="member"))
-        db.session.commit()
+        try:
+            db.session.add(TeamMember(team_id=team.id, user_id=user.id, role="member"))
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("team member add")
+            flash("メンバー追加に失敗しました。時間を置いて再試行してください。", "danger")
+            return render_template(
+                "todo/team_detail.html",
+                team=team,
+                members=members,
+                form=form,
+                remove_form=remove_form,
+            )
         flash("メンバーを追加しました。")
         return redirect(url_for("todo.team_detail", team_id=team.id))
 
@@ -109,7 +140,12 @@ def team_member_remove(team_id: int, user_id: int):
     if current_user.id != team.owner_id:
         abort(403)
 
-    db.session.delete(team_member)
-    db.session.commit()
+    try:
+        db.session.delete(team_member)
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("team member remove")
+        flash("メンバー削除に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(url_for("todo.team_detail", team_id=team.id))
     flash("メンバーを外しました。")
     return redirect(url_for("todo.team_detail", team_id=team.id))

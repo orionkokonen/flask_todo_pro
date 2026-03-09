@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
+from app.db_utils import rollback_session
 from app.forms import EmptyForm, SubTaskForm, TaskForm
 from app.models import Project, SubTask, Task
 from app.todo import bp
@@ -79,8 +81,19 @@ def task_new():
             project=project,
             created_by=current_user,
         )
-        db.session.add(task)
-        db.session.commit()
+        try:
+            db.session.add(task)
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("task create")
+            flash("タスクを追加できませんでした。時間を置いて再試行してください。", "danger")
+            return render_template(
+                "todo/task_form.html",
+                form=form,
+                title="新しいタスク",
+                task=None,
+                delete_form=EmptyForm(),
+            )
         flash("タスクを追加しました。")
         return redirect(url_for("todo.board"))
 
@@ -143,7 +156,18 @@ def task_edit(task_id: int):
         task.due_date = form.due_date.data
         task.project = project
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("task edit")
+            flash("更新を保存できませんでした。時間を置いて再試行してください。", "danger")
+            return render_template(
+                "todo/task_form.html",
+                form=form,
+                title="タスク編集",
+                task=task,
+                delete_form=EmptyForm(),
+            )
         flash("更新しました。")
         return redirect(url_for("todo.task_detail", task_id=task.id))
 
@@ -162,8 +186,13 @@ def task_delete(task_id: int):
     """タスク削除。権限チェック済みのタスクのみ削除対象にする。"""
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
-    db.session.delete(task)
-    db.session.commit()
+    try:
+        db.session.delete(task)
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("task delete")
+        flash("タスク削除に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(url_for("todo.task_detail", task_id=task.id))
     flash("削除しました。")
     return redirect(url_for("todo.board"))
 
@@ -187,7 +216,12 @@ def task_move(task_id: int):
         abort(400)
 
     task.status = new_status
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("task move")
+        flash("ステータス更新に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
     # 元の画面へ戻すと操作感が自然。
     # 参照元が取れない場合だけ安全な既定値としてボードへ戻す。
     return redirect(request.referrer or url_for("todo.board"))
@@ -203,8 +237,13 @@ def subtask_add(task_id: int):
     form = SubTaskForm()
     if form.validate_on_submit():
         subtask = SubTask(title=form.title.data, task=task)
-        db.session.add(subtask)
-        db.session.commit()
+        try:
+            db.session.add(subtask)
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("subtask create")
+            flash("サブタスクを追加できませんでした。時間を置いて再試行してください。", "danger")
+            return redirect(url_for("todo.task_detail", task_id=task.id))
         flash("サブタスクを追加しました。")
 
     return redirect(url_for("todo.task_detail", task_id=task.id))
@@ -219,7 +258,12 @@ def subtask_toggle(subtask_id: int):
     ensure_task_access(task)
 
     subtask.done = not subtask.done
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("subtask toggle")
+        flash("サブタスク更新に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
     return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
 
 
@@ -231,7 +275,12 @@ def subtask_delete(subtask_id: int):
     task = subtask.task
     ensure_task_access(task)
 
-    db.session.delete(subtask)
-    db.session.commit()
+    try:
+        db.session.delete(subtask)
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("subtask delete")
+        flash("サブタスク削除に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))
     flash("サブタスクを削除しました。")
     return redirect(request.referrer or url_for("todo.task_detail", task_id=task.id))

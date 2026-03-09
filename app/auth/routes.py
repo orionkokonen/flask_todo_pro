@@ -8,9 +8,11 @@ from urllib.parse import urljoin, urlparse
 
 from flask import current_app, flash, make_response, redirect, render_template, request, url_for
 from flask_login import login_required, login_user, logout_user
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
 from app.auth import bp
+from app.db_utils import rollback_session
 from app.forms import LoginForm, RegistrationForm
 from app.models import User
 from app.security import auth_rate_limiter
@@ -94,8 +96,13 @@ def register():
     if form.validate_on_submit():
         user = User(username=form.username.data)
         user.set_password(form.password.data)
-        db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.add(user)
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("user registration")
+            flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
+            return _render_auth_template("auth/register.html", form)
         # 成功したら同じ IP の失敗カウントを消し、正規ユーザーを巻き込まないようにする。
         auth_rate_limiter.reset(bucket)
         # 登録直後に自動ログインし、再入力の手間を省く。
@@ -160,7 +167,7 @@ def login():
             _client_ip(),
         )
         # ユーザー名・パスワードのどちらが間違っているかは教えない（セキュリティ上の配慮）。
-        flash("ユーザー名またはパスワードが違います。")
+        flash("ログインに失敗しました。入力内容を確認してください。")
     return _render_auth_template("auth/login.html", form)
 
 

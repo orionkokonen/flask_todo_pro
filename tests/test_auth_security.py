@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.exc import SQLAlchemyError
+
+from app import db
 from app.models import User
 
 
@@ -256,3 +259,76 @@ def test_register_stores_password_hash_with_scrypt(app, client):
         # このテストでプレフィックスを固定することで、将来 Werkzeug のデフォルトが変わったとき
         # に意図せずハッシュ方式が切り替わるリグレッションをテストで検知できる。
         assert user.password_hash.startswith("scrypt:")
+
+
+def test_register_duplicate_username_shows_generic_message(client, create_user):
+    """重複ユーザー名でも存在有無を直接示さないメッセージを返す。"""
+    create_user("duplicated_user", "password123")
+
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "duplicated_user",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=False,
+    )
+
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "登録内容を確認して、別のユーザー名で再試行してください。" in body
+    assert "このユーザー名は既に使用されています。" not in body
+
+
+def test_register_commit_error_rolls_back_and_shows_generic_flash(
+    app,
+    client,
+    monkeypatch,
+):
+    """登録時の DB 書き込み失敗で rollback し、次の処理へ壊れたセッションを残さない。"""
+    rollback_called = False
+    original_commit = db.session.commit
+    original_rollback = db.session.rollback
+    state = {"failed_once": False}
+
+    def flaky_commit():
+        if not state["failed_once"]:
+            state["failed_once"] = True
+            raise SQLAlchemyError("forced failure")
+        return original_commit()
+
+    def tracking_rollback():
+        nonlocal rollback_called
+        rollback_called = True
+        return original_rollback()
+
+    monkeypatch.setattr(db.session, "commit", flaky_commit)
+    monkeypatch.setattr(db.session, "rollback", tracking_rollback)
+
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "commit_error_user",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert rollback_called is True
+    assert "登録を完了できませんでした。入力内容を確認して再試行してください。" in (
+        response.get_data(as_text=True)
+    )
+
+    with app.app_context():
+        assert User.query.filter_by(username="commit_error_user").first() is None
+
+        recovery_user = User(username="post_error_recovery_user")
+        recovery_user.set_password("StrongPass123")
+        db.session.add(recovery_user)
+        db.session.commit()
+
+        assert User.query.filter_by(username="post_error_recovery_user").first() is not None

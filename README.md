@@ -30,6 +30,51 @@
 
 ---
 
+## アーキテクチャ図
+
+```mermaid
+flowchart LR
+    Browser["Browser / PWA"] -->|GET / POST| Routes["Flask Blueprints<br/>auth / todo"]
+    Routes --> Authz["認証・認可<br/>@login_required / ensure_*_access"]
+    Routes --> Forms["WTForms + CSRF"]
+    Routes --> Templates["Jinja2 Templates"]
+    Authz --> Models["SQLAlchemy Models"]
+    Forms --> Models
+    Models --> DB["SQLite (local) / PostgreSQL (prod)"]
+    Routes --> Logs["監査ログ / 例外ログ"]
+    Templates --> Browser
+```
+
+### レイヤごとの役割
+
+- `app/auth/routes.py` と `app/todo/routes_*.py` が HTTP の入口になり、認証・認可・バリデーション・永続化を順番に組み立てる
+- `app/todo/shared.py` と各モデルの `can_access()` が「誰がどこまで見てよいか」の判定を集約する
+- `app/forms.py` が入力形式とパスワードポリシーを担保し、`Flask-WTF` が CSRF を自動検証する
+- `app/db_utils.py` が DB 書き込み失敗時の `rollback()` と例外ログ出力を共通化し、更新系ルートは `commit()` 失敗後にセッションを壊したまま残さない
+- `app/__init__.py` が Cookie 属性、CSP、HSTS、ProxyFix など「アプリ全体に効く安全装置」をまとめて初期化する
+
+---
+
+## セキュリティ設計の要点
+
+| 観点 | どこで守るか | 具体策 |
+|------|--------------|--------|
+| 本人確認 | `app/auth/routes.py` | ログイン、セッション、remember cookie、Open Redirect 対策 |
+| 認可 | `app/todo/shared.py`, `app/models.py` | 他人のタスク・他チームのプロジェクトを `403` で拒否 |
+| フォーム改ざん | `Flask-WTF`, 各 route | CSRF トークン検証、`project_id`・`status` の再検証 |
+| ユーザー列挙対策 | 認証・チーム追加 UI | ログイン失敗、登録重複、チーム追加失敗の文言を汎用化 |
+| DB 障害耐性 | 更新系 route + `app/db_utils.py` | `db.session.commit()` を `try/except` で囲み、失敗時は `rollback()` と例外ログ |
+| ブルートフォース耐性 | `app/security.py` | ログイン/登録に IP ベースのレート制限 |
+| ブラウザ側防御 | `app/__init__.py` | CSP, HSTS, `X-Frame-Options`, `HttpOnly`, `SameSite=Lax` |
+
+### 面接で説明しやすいポイント
+
+- 認証と認可を分離しており、「ログインしている」と「そのデータに触れてよい」は別レイヤで確認している
+- DB 書き込みは成功系だけでなく失敗系も設計しており、例外時に `rollback()` して次のリクエストへ壊れたセッション状態を持ち越さない
+- UI に返す文言は必要以上に内部状態を漏らさず、詳細はサーバーログへ寄せて運用調査性と公開情報量を分離している
+
+---
+
 ## 全体の処理の流れ（最重要）
 
 ### リクエストの基本的な流れ
@@ -276,6 +321,8 @@ python -m flask --app wsgi.py db upgrade
 - Session and remember cookies use `HttpOnly` and `SameSite=Lax`; production-equivalent runs also enable `Secure`, and `remember me` is capped at 30 days.
 - Login `next` redirect allows only same-origin targets.
 - Login and registration use a simple in-memory rate limit to slow repeated attempts. With multiple Gunicorn workers, each process keeps its own counter, so two workers can effectively allow roughly double the attempts.
+- Registration, login, and team-member-add flows avoid explicit existence messages in the UI to reduce user-enumeration hints.
+- Mutation routes wrap `db.session.commit()` in `try/except` and call `rollback()` on failure before returning control to the user.
 - `PROXY_FIX_TRUSTED_HOPS` defaults to `0` so forwarded client IP headers are ignored by default; set it to `1` behind a single trusted reverse proxy such as Render.
 - Security headers include CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy`. CSP now blocks inline scripts, while inline styles remain allowed for template compatibility.
 - Password reset is not implemented yet; a production build should add an email or SMS reset flow.

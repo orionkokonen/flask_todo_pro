@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from flask import abort, current_app, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
+from app.db_utils import rollback_session
 from app.forms import EmptyForm, ProjectForm
 from app.models import Project, Team, TeamMember
 from app.todo import bp
@@ -54,8 +56,18 @@ def projects():
             owner=current_user,
             team=team,
         )
-        db.session.add(project)
-        db.session.commit()
+        try:
+            db.session.add(project)
+            db.session.commit()
+        except SQLAlchemyError:
+            rollback_session("project create")
+            flash("プロジェクトを作成できませんでした。時間を置いて再試行してください。", "danger")
+            return render_template(
+                "todo/projects.html",
+                projects=projs,
+                form=form,
+                delete_form=delete_form,
+            )
         flash("プロジェクトを作成しました。")
         return redirect(url_for("todo.projects"))
 
@@ -96,7 +108,12 @@ def project_delete(project_id: int):
         )
         abort(403)
 
-    db.session.delete(project)
-    db.session.commit()
+    try:
+        db.session.delete(project)
+        db.session.commit()
+    except SQLAlchemyError:
+        rollback_session("project delete")
+        flash("プロジェクト削除に失敗しました。時間を置いて再試行してください。", "danger")
+        return redirect(url_for("todo.projects"))
     flash("プロジェクトを削除しました。")
     return redirect(url_for("todo.projects"))

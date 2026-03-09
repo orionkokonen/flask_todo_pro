@@ -57,10 +57,15 @@ class RegistrationForm(FlaskForm):
 
         validate_<フィールド名> というメソッド名は WTForms が自動で呼ぶ規約。
         DB の unique 制約だけだと生のエラー画面になるため、ここで先に防ぐ。
+        ただし存在有無をそのまま返すと列挙の手がかりになるため、文言は汎用化する。
         """
-        user = User.query.filter_by(username=username.data).first()
+        normalized_username = (username.data or "").strip()
+        username.data = normalized_username
+        if not normalized_username:
+            raise ValidationError("ユーザー名を入力してください。")
+        user = User.query.filter_by(username=normalized_username).first()
         if user:
-            raise ValidationError("このユーザー名は既に使用されています。")
+            raise ValidationError("登録内容を確認して、別のユーザー名で再試行してください。")
 
     def validate_password(self, password):
         """パスワードが強度ポリシー（最低文字数・文字種など）を満たすか検証する。

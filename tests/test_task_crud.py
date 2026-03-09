@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app import db
 from app.models import Task
 
@@ -195,3 +197,74 @@ def test_legacy_task_set_status_route_returns_404(
     )
 
     assert response.status_code == 404
+
+
+def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
+    app,
+    client,
+    create_user,
+    login,
+    monkeypatch,
+):
+    """タスク保存失敗時に rollback し、その後の書き込みで PendingRollbackError を残さない。"""
+    create_user("task_commit_user", "password123")
+
+    login_response = login("task_commit_user", "password123")
+    assert login_response.status_code == 302
+
+    rollback_called = False
+    original_commit = db.session.commit
+    original_rollback = db.session.rollback
+    state = {"failed_once": False}
+
+    def flaky_commit():
+        if not state["failed_once"]:
+            state["failed_once"] = True
+            raise SQLAlchemyError("forced failure")
+        return original_commit()
+
+    def tracking_rollback():
+        nonlocal rollback_called
+        rollback_called = True
+        return original_rollback()
+
+    monkeypatch.setattr(db.session, "commit", flaky_commit)
+    monkeypatch.setattr(db.session, "rollback", tracking_rollback)
+
+    response = client.post(
+        "/todo/tasks/new",
+        data={
+            "title": "Broken Task",
+            "description": "should not persist",
+            "status": Task.STATUS_TODO,
+            "due_date": "",
+            "project_id": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert rollback_called is True
+    assert "タスクを追加できませんでした。時間を置いて再試行してください。" in (
+        response.get_data(as_text=True)
+    )
+
+    with app.app_context():
+        assert Task.query.filter_by(title="Broken Task").first() is None
+
+    recovery_response = client.post(
+        "/todo/tasks/new",
+        data={
+            "title": "Recovered Task",
+            "description": "session recovered",
+            "status": Task.STATUS_TODO,
+            "due_date": "",
+            "project_id": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert recovery_response.status_code == 302
+
+    with app.app_context():
+        assert Task.query.filter_by(title="Recovered Task").first() is not None

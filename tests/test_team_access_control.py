@@ -136,3 +136,40 @@ def test_team_task_create_blocks_outsider_using_project_id_directly(
 
     with app.app_context():
         assert Task.query.filter_by(title="Should be rejected").first() is None
+
+
+def test_team_member_add_shows_same_generic_error_for_missing_and_existing_user(
+    client,
+    create_team,
+    create_user,
+    login,
+):
+    """ユーザー未登録と既存メンバーの両方で同じメッセージを返し、列挙の手がかりを減らす。"""
+    owner = create_user("team_manage_owner", "password123")
+    member = create_user("team_manage_member", "password123")
+    team = create_team(owner, members=[member], name="Ops Team")
+
+    login_response = login("team_manage_owner", "password123")
+    assert login_response.status_code == 302
+
+    missing_response = client.post(
+        f"/todo/teams/{team.id}",
+        data={"username": "missing_account"},
+        follow_redirects=True,
+    )
+    existing_response = client.post(
+        f"/todo/teams/{team.id}",
+        data={"username": "team_manage_member"},
+        follow_redirects=True,
+    )
+
+    missing_body = missing_response.get_data(as_text=True)
+    existing_body = existing_response.get_data(as_text=True)
+    generic_error = "メンバーを追加できませんでした。入力内容を確認して再試行してください。"
+
+    assert missing_response.status_code == 200
+    assert existing_response.status_code == 200
+    assert generic_error in missing_body
+    assert generic_error in existing_body
+    assert "そのユーザー名は見つかりませんでした。" not in missing_body
+    assert "既にメンバーです。" not in existing_body
