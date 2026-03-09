@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+import app.security as security_module
+
 
 def _post_weak_registration(client, username: str, forwarded_for: str | None = None):
     """わざとパスワードポリシー違反の登録リクエストを送るヘルパー。
@@ -29,6 +31,21 @@ def _post_weak_registration(client, username: str, forwarded_for: str | None = N
         headers=headers,
         follow_redirects=False,
     )
+
+
+def test_rate_limiter_prune_removes_empty_bucket(monkeypatch):
+    """期限切れで空になったバケットは内部辞書から削除される。"""
+    limiter = security_module.SimpleRateLimiter()
+    times = iter([0.0, 61.0])
+    monkeypatch.setattr(security_module, "monotonic", lambda: next(times))
+
+    limiter.record_failure("login:127.0.0.1", window_seconds=60)
+
+    allowed, retry_after = limiter.check("login:127.0.0.1", limit=5, window_seconds=60)
+
+    assert allowed is True
+    assert retry_after == 0
+    assert "login:127.0.0.1" not in limiter._entries
 
 
 def test_login_rate_limit_blocks_after_too_many_failures(client, create_user):

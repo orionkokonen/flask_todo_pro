@@ -19,6 +19,8 @@ def utc_now() -> datetime:
     Python 3.12 で datetime.utcnow() が非推奨になったため、
     now(utc) で取得してタイムゾーン情報を外す（DB カラムとの互換性のため）。
     """
+    # SQLite では naive datetime を前提に扱うため、このアプリでは
+    # 「naive datetime は UTC」と決めて aware UTC を外して保存する。
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 

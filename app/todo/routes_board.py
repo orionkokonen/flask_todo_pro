@@ -12,6 +12,7 @@ from flask import render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy.orm import selectinload
 
+from app import db
 from app.models import Project, Task
 from app.todo import bp
 from app.todo.shared import (
@@ -55,13 +56,13 @@ def board():
     # スコープフィルター: 「個人」「チーム」「すべて」の 3 種で表示範囲を切り替える。
     # unassigned はプロジェクト未所属かつ自分が作成したタスクで、個人スコープ扱いとする。
     personal_projects = Project.team_id.is_(None) & (Project.owner_id == current_user.id)
-    team_projects = Project.team_id.in_(team_ids) if team_ids else False
+    team_projects = Project.team_id.in_(team_ids) if team_ids else db.false()
     unassigned = (Task.project_id.is_(None) & (Task.created_by_id == current_user.id))
 
     if scope == "personal":
         base = base.filter(personal_projects | unassigned)
     elif scope == "team":
-        base = base.filter(team_projects) if team_ids else base.filter(False)
+        base = base.filter(team_projects) if team_ids else base.filter(db.false())
     else:
         base = base.filter(personal_projects | team_projects | unassigned)
 

@@ -6,7 +6,7 @@ HTTP レベルで検証する。認可ロジックの漏れを継続的に検知
 from __future__ import annotations
 
 from app import db
-from app.models import Project
+from app.models import Project, Task
 
 
 def _logout(client) -> None:
@@ -96,3 +96,37 @@ def test_team_project_delete_blocks_outsider_and_keeps_project(
     with app.app_context():
         # 403 で弾かれた後も、プロジェクトが DB に残っていることを確認する。
         assert db.session.get(Project, project.id) is not None
+
+
+def test_team_task_create_blocks_outsider_using_project_id_directly(
+    app,
+    client,
+    create_project,
+    create_team,
+    create_user,
+    login,
+):
+    owner = create_user("hidden_project_owner", "password123")
+    create_user("hidden_project_outsider", "password123")
+    team = create_team(owner, name="Private Team")
+    project = create_project(owner, team=team, name="Secret Project")
+
+    login_response = login("hidden_project_outsider", "password123")
+    assert login_response.status_code == 302
+
+    response = client.post(
+        "/todo/tasks/new",
+        data={
+            "title": "Should be rejected",
+            "description": "outsider tried to bind a team project",
+            "status": Task.STATUS_TODO,
+            "due_date": "",
+            "project_id": str(project.id),
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+
+    with app.app_context():
+        assert Task.query.filter_by(title="Should be rejected").first() is None

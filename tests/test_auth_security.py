@@ -6,6 +6,8 @@ next パラメータの同一オリジン検証と、文字種バリデーショ
 """
 from __future__ import annotations
 
+import logging
+
 from app.models import User
 
 
@@ -50,6 +52,36 @@ def test_login_allows_safe_relative_next_redirect(client, create_user):
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/todo/projects")
+
+
+def test_login_success_writes_audit_log(client, create_user, caplog):
+    create_user("audit_success_user", "password123")
+    caplog.set_level(logging.INFO)
+
+    response = client.post(
+        "/auth/login",
+        data={"username": "audit_success_user", "password": "password123"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert "login succeeded:" in caplog.text
+    assert "username=audit_success_user" in caplog.text
+
+
+def test_login_failure_writes_audit_log(client, create_user, caplog):
+    create_user("audit_failed_user", "password123")
+    caplog.set_level(logging.WARNING)
+
+    response = client.post(
+        "/auth/login",
+        data={"username": "audit_failed_user", "password": "wrong-password"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "login failed:" in caplog.text
+    assert "username=audit_failed_user" in caplog.text
 
 
 def test_register_rejects_password_shorter_than_min_length(app, client):

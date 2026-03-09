@@ -42,6 +42,9 @@ class SimpleRateLimiter:
         cutoff = now - window_seconds
         while entries and entries[0] <= cutoff:
             entries.popleft()
+        if not entries:
+            self._entries.pop(bucket, None)
+            return None
         return entries
 
     def check(self, bucket: str, limit: int, window_seconds: int) -> tuple[bool, int]:

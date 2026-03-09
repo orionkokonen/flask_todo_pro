@@ -47,7 +47,7 @@ def get_accessible_projects_query(team_ids: list[int] | None = None):
     team = (
         Project.query.filter(Project.team_id.in_(team_ids))
         if team_ids
-        else Project.query.filter(False)
+        else Project.query.filter(db.false())
     )
     return personal.union(team)
 

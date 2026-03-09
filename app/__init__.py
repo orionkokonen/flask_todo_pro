@@ -39,7 +39,7 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "default-src 'self'",        # 指定がないものは自ドメインのみ許可
         "script-src 'self'",         # JS は自ドメインのみ（XSS 対策の要）
         "style-src 'self' 'unsafe-inline'",  # CSS は自ドメイン＋インライン style
-        "img-src 'self' data:",      # 画像は自ドメイン＋data URI
+        "img-src 'self'",            # 画像は自ドメイン配信のみ。data: は使っていないので許可しない。
         "font-src 'self'",           # フォントは自ドメインのみ
         "connect-src 'self'",        # fetch/XHR は自ドメインのみ
         "object-src 'none'",         # Flash 等のプラグインは全面禁止

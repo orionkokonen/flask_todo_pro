@@ -58,8 +58,8 @@ def _rate_limited_response(template_name: str, form, retry_after: int):
     HTTPステータス429＝「リクエストが多すぎる」ことを示す標準のエラーコード。
     """
     flash(
-        "\u8a66\u884c\u56de\u6570\u304c\u591a\u3059\u304e\u307e\u3059\u3002"
-        "\u5c11\u3057\u6642\u9593\u3092\u7f6e\u3044\u3066\u518d\u8a66\u884c\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+        "試行回数が多すぎます。"
+        "少し時間を置いて再試行してください。",
         "warning",
     )
     return _render_auth_template(
@@ -94,10 +94,7 @@ def register():
         auth_rate_limiter.reset(bucket)
         # 登録直後に自動ログインし、再入力の手間を省く。
         login_user(user)
-        flash(
-            "\u767b\u9332\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\u3002"
-            "\u30ed\u30b0\u30a4\u30f3\u3057\u307e\u3057\u305f\u3002"
-        )
+        flash("登録が完了しました。ログインしました。")
         # 登録後は固定ページへ飛ばす。next パラメータを使わないのは Open Redirect 対策。
         return redirect(url_for("todo.board"))
 
@@ -130,6 +127,12 @@ def login():
         if user and user.check_password(form.password.data):
             auth_rate_limiter.reset(bucket)
             login_user(user, remember=form.remember_me.data)
+            current_app.logger.info(
+                "login succeeded: user_id=%s username=%s ip=%s",
+                user.id,
+                user.username,
+                _client_ip(),
+            )
             # ログイン前に行こうとしたページへ戻す。安全な URL か必ず検証する。
             next_page = request.args.get("next")
             if not next_page or not _is_safe_redirect_target(next_page):
@@ -140,11 +143,13 @@ def login():
             bucket,
             current_app.config["LOGIN_RATE_LIMIT_WINDOW_SECONDS"],
         )
-        # ユーザー名・パスワードのどちらが間違っているかは教えない（セキュリティ上の配慮）。
-        flash(
-            "\u30e6\u30fc\u30b6\u30fc\u540d\u307e\u305f\u306f"
-            "\u30d1\u30b9\u30ef\u30fc\u30c9\u304c\u9055\u3044\u307e\u3059\u3002"
+        current_app.logger.warning(
+            "login failed: username=%s ip=%s",
+            form.username.data,
+            _client_ip(),
         )
+        # ユーザー名・パスワードのどちらが間違っているかは教えない（セキュリティ上の配慮）。
+        flash("ユーザー名またはパスワードが違います。")
     return _render_auth_template("auth/login.html", form)
 
 
@@ -153,5 +158,5 @@ def login():
 def logout():
     """ログアウト処理。POST のみ受け付けるのは CSRF 対策のため。"""
     logout_user()
-    flash("\u30ed\u30b0\u30a2\u30a6\u30c8\u3057\u307e\u3057\u305f\u3002")
+    flash("ログアウトしました。")
     return redirect(url_for("auth.login"))

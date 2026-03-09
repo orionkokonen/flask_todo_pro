@@ -23,6 +23,21 @@ from app.todo.shared import (
 )
 
 
+def _posted_project_or_abort() -> Project | None:
+    """POST された project_id を明示的に検証し、不正値は早めに弾く。"""
+    raw_project_id = request.form.get("project_id")
+    if raw_project_id in (None, ""):
+        return None
+    try:
+        project_id = int(raw_project_id)
+    except (TypeError, ValueError):
+        abort(400)
+
+    project = get_or_404(Project, project_id)
+    ensure_project_access(project)
+    return project
+
+
 @bp.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def task_new():
@@ -40,6 +55,8 @@ def task_new():
     preset_status = (request.args.get("status") or "").upper()
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
+    if request.method == "POST":
+        _posted_project_or_abort()
 
     if form.validate_on_submit():
         project = None
@@ -151,7 +168,7 @@ def task_move(task_id: int):
     task = get_or_404(Task, task_id)
     ensure_task_access(task)
 
-    new_status = (request.form.get("status") or request.form.get("to") or "").upper()
+    new_status = (request.form.get("status") or "").upper()
     # フォーム値の改ざん対策：許可リストでサーバー側検証する。
     if new_status not in Task.VALID_STATUSES:
         abort(400)

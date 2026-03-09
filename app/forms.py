@@ -29,7 +29,7 @@ def optional_int(value):
 
     未選択（空文字）のとき int() に変換するとエラーになるので、None を返す。
     """
-    if value in (None, "", "None"):
+    if value in (None, ""):
         return None
     return int(value)
 

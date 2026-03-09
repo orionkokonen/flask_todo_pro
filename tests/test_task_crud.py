@@ -116,6 +116,34 @@ def test_task_move_rejects_invalid_status(
         assert persisted.status == Task.STATUS_TODO
 
 
+def test_task_move_rejects_legacy_to_param(
+    app,
+    client,
+    create_task,
+    create_user,
+    login,
+):
+    """status パラメータのみ受け付け、旧 to パラメータは 400 にする。"""
+    user = create_user("legacy_move_user", "password123")
+    task = create_task(user, title="Legacy move")
+
+    login_response = login("legacy_move_user", "password123")
+    assert login_response.status_code == 302
+
+    response = client.post(
+        f"/todo/tasks/{task.id}/move",
+        data={"to": Task.STATUS_DONE},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        persisted = db.session.get(Task, task.id)
+        assert persisted is not None
+        assert persisted.status == Task.STATUS_TODO
+
+
 def test_task_move_updates_status_via_current_route(
     app,
     client,
