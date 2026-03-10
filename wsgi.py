@@ -1,6 +1,6 @@
 """本番環境(Render / gunicorn)向けのWSGIエントリポイント。
 
-Run:
+実行方法:
     gunicorn wsgi:app
 
 アプリ設定やSECRET_KEYの検証は create_app 側に集約し、
