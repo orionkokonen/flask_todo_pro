@@ -18,20 +18,10 @@ from app.redirects import is_safe_redirect_target
 from app.security import auth_rate_limiter
 
 
-def _is_safe_redirect_target(target: str) -> bool:
-    """リダイレクト先が自分のサイト内かチェックする。
-
-    Open Redirect（＝悪意ある外部URLへユーザーを飛ばす攻撃）を防ぐための関数。
-    実体は app.redirects 側にあり、このファイルでは「認証まわりで何を守るか」が
-    読み取りやすいよう薄いラッパーにしている。
-    """
-    return is_safe_redirect_target(target)
-
-
-# ユーザーが存在しない時にもハッシュ照合を 1 回通すためのダミー値。
-# 「存在する時だけ重い処理をする」差があると、応答時間から
-# ユーザー有無を推測されやすくなるので、その差を小さくする目的で使う。
-_DUMMY_PASSWORD_HASH = generate_password_hash("codex-dummy-password", method="scrypt")
+# タイミング攻撃緩和専用のハッシュ値。認証には使用しない。
+# ユーザーが存在しない場合にも同等の計算時間をかけることで、
+# 応答速度の差からユーザー有無を推測されるのを防ぐ。
+_TIMING_EQUALIZATION_HASH = generate_password_hash("dummy-timing-pad", method="scrypt")
 
 
 def _client_ip() -> str:
@@ -119,8 +109,6 @@ def register():
             # 詳細は rollback_session() 側のログへ残す。
             flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
             return _render_auth_template("auth/register.html", form)
-        # 成功したら同じ IP の失敗カウントを消し、正規ユーザーを巻き込まないようにする。
-        auth_rate_limiter.reset(bucket)
         # 登録直後に自動ログインし、再入力の手間を省く。
         login_user(user)
         flash("登録が完了しました。ログインしました。")
@@ -163,7 +151,7 @@ def login():
         password_matches = False
         if user is None:
             # 結果は使わず、「照合処理を通った」という事実だけをそろえる。
-            check_password_hash(_DUMMY_PASSWORD_HASH, form.password.data)
+            check_password_hash(_TIMING_EQUALIZATION_HASH, form.password.data)
         else:
             password_matches = user.check_password(form.password.data)
 

@@ -1,7 +1,7 @@
 """pytest 共通フィクスチャ定義。
 
 テスト設計の方針:
-- テストごとに tmp_path で一時 SQLite DB を作成し、テスト間のデータ混入を防ぐ。
+- テストごとに repo ローカルの一時 SQLite DB を作成し、テスト間のデータ混入を防ぐ。
 - WTF_CSRF_ENABLED=False にして CSRF トークン検証をスキップし、
   テストクライアントから直接 POST できるようにしている
   （本番の CSRF 保護は別途専用テストで確認する）。
@@ -11,13 +11,20 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
+import shutil
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
 from app import create_app, db
 from app.models import Project, Task, Team, TeamMember, User
 from app.security import auth_rate_limiter
+
+
+TEST_RUNTIME_ROOT = Path(__file__).resolve().parent / "_runtime_tmp"
+TEST_RUNTIME_ROOT.mkdir(exist_ok=True)
 
 
 @pytest.fixture(autouse=True)
@@ -30,18 +37,20 @@ def clear_rate_limiter():
 
 
 @pytest.fixture
-def app_factory(tmp_path):
+def app_factory():
     """任意の設定を注入できるアプリファクトリ fixture。
 
     CSRF 有効アプリや本番相当設定（TESTING=False）など、シナリオに応じたアプリを
     同一テスト内で複数作れるよう、関数を返すファクトリパターンを採用している。
-    tmp_path でテストごとに一意な SQLite DB パスを生成するため、
+    repo ローカルの一時ディレクトリ配下でテストごとに一意な SQLite DB パスを生成するため、
     テスト間でデータが混入しない。
     """
     created_apps = []
+    run_dir = TEST_RUNTIME_ROOT / uuid4().hex
+    run_dir.mkdir()
 
     def _create_app(overrides: dict[str, Any] | None = None):
-        database_path = tmp_path / f"test_{len(created_apps)}.db"
+        database_path = run_dir / f"test_{len(created_apps)}.db"
         config = {
             "TESTING": True,
             "SECRET_KEY": "test-secret",
@@ -65,12 +74,14 @@ def app_factory(tmp_path):
             db.session.remove()
             db.drop_all()
 
+    shutil.rmtree(run_dir, ignore_errors=True)
+
 
 @pytest.fixture
 def app(app_factory):
     """テスト専用の Flask アプリを生成する。
 
-    tmp_path で一意な一時 DB を作るため、テスト間でデータが混ざらない。
+    repo ローカルの一時 DB を使うため、テスト間でデータが混ざらない。
     TESTING=True でエラーが例外として上がるようにし、
     WTF_CSRF_ENABLED=False でフォームの CSRF 検証を無効化して
     テストクライアントから直接 POST できるようにする。

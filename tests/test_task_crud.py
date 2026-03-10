@@ -330,3 +330,36 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
 
     with app.app_context():
         assert Task.query.filter_by(title="Recovered Task").first() is not None
+
+
+def test_other_user_cannot_edit_task(app, client, create_user, create_task, login):
+    """他人のタスクを編集しようとすると 403 が返る。"""
+    owner = create_user("owner", "OwnerPass1234")
+    other = create_user("other", "OtherPass1234")
+    task = create_task(created_by=owner, title="Owner Task")
+
+    login("other", "OtherPass1234")
+    resp = client.get(f"/todo/tasks/{task.id}/edit")
+    assert resp.status_code == 403
+
+
+def test_other_user_cannot_delete_task(app, client, create_user, create_task, login):
+    """他人のタスクを削除しようとすると 403 が返る。"""
+    owner = create_user("owner", "OwnerPass1234")
+    other = create_user("other", "OtherPass1234")
+    task = create_task(created_by=owner, title="Owner Task")
+
+    login("other", "OtherPass1234")
+    resp = client.post(f"/todo/tasks/{task.id}/delete")
+    assert resp.status_code == 403
+
+
+def test_other_user_cannot_view_task_detail(app, client, create_user, create_task, login):
+    """他人のタスク詳細を閲覧しようとすると 403 が返る。"""
+    owner = create_user("owner", "OwnerPass1234")
+    other = create_user("other", "OtherPass1234")
+    task = create_task(created_by=owner, title="Owner Task")
+
+    login("other", "OtherPass1234")
+    resp = client.get(f"/todo/tasks/{task.id}")
+    assert resp.status_code == 403

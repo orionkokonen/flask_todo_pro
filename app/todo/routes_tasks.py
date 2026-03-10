@@ -162,6 +162,8 @@ def task_edit(task_id: int):
 
         task.title = form.title.data
         task.description = form.description.data or ""
+        if form.status.data not in Task.VALID_STATUSES:
+            abort(400)
         task.status = form.status.data
         task.due_date = form.due_date.data
         task.project = project

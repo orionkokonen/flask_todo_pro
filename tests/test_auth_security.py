@@ -119,7 +119,7 @@ def test_login_unknown_user_runs_dummy_hash_check(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert calls == [(auth_routes._DUMMY_PASSWORD_HASH, "WrongPass123")]
+    assert calls == [(auth_routes._TIMING_EQUALIZATION_HASH, "WrongPass123")]
 
 
 def test_register_rejects_password_shorter_than_min_length(app, client):
