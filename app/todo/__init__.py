@@ -1,3 +1,8 @@
+"""ToDo 機能用 Blueprint パッケージ。
+
+ボード、タスク、プロジェクト、チームを 1 つの大きな機能群としてまとめ、
+URL のまとまりを auth 側と分けて見通しをよくしている。
+"""
 from flask import Blueprint
 
 # Blueprint（URL ルーティングをグループ化する Flask の仕組み）を定義。

@@ -1,3 +1,8 @@
+"""認証機能用 Blueprint パッケージ。
+
+Blueprint は URL を機能ごとにまとめるための仕組みで、
+このパッケージではログイン・登録・ログアウト関連だけを担当する。
+"""
 from flask import Blueprint
 
 # Blueprint（ルーティングのグループ）を定義し、後からルートをインポートする。

@@ -13,6 +13,11 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config:
+    """Flask アプリ全体で共有する基本設定。
+
+    役割ごとに値を並べておくと、「どの設定が何を守っているか」を
+    ひと目で追いやすくなる。
+    """
     # --- セッション暗号化キー ---
     # Cookie の署名（=改ざん検知）に使う秘密鍵。環境変数から注入し、コードに直書きしない。
     # 空のまま起動すると create_app() で RuntimeError になる（安全装置）。

@@ -20,6 +20,7 @@ def test_team_detail_blocks_outsider_but_allows_member(
     create_user,
     login,
 ):
+    """チーム詳細画面は所属メンバーだけが開けることを確認する。"""
     owner = create_user("team_owner", "password123")
     member = create_user("team_member", "password123")
     create_user("team_outsider", "password123")
@@ -48,6 +49,7 @@ def test_team_task_detail_blocks_outsider_but_allows_member(
     create_user,
     login,
 ):
+    """チーム共有タスクの詳細も、チーム外ユーザーには見せないことを確認する。"""
     owner = create_user("task_owner", "password123")
     member = create_user("task_member", "password123")
     create_user("task_outsider", "password123")
@@ -78,6 +80,7 @@ def test_team_project_delete_blocks_outsider_and_keeps_project(
     create_user,
     login,
 ):
+    """チーム外ユーザーの削除リクエストは拒否され、データも残ることを確認する。"""
     owner = create_user("project_owner", "password123")
     create_user("project_outsider", "password123")
     team = create_team(owner, name="Platform Team")

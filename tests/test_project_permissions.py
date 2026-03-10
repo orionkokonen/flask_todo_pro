@@ -10,6 +10,7 @@ from app.models import Project, Team, TeamMember
 
 
 def test_team_project_delete_forbidden_for_member_and_allowed_for_owner(app, client, create_user):
+    """同じチーム内でも、削除は owner だけに限定されていることを確認する。"""
     with app.app_context():
         owner = create_user("owner_user", "password123")
         member = create_user("member_user", "password123")

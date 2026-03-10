@@ -90,6 +90,8 @@ function networkFirst(request, options = {}) {
   return fetch(request)
     .then((response) => cacheResponse(request, response))
     .catch(() =>
+      // ignoreSearch=true にすると `?v=...` の違いを無視して同じ資産として探せる。
+      // CSS/JS の版番号付きURLでもキャッシュを再利用しやすくするための設定。
       caches.match(request, { ignoreSearch }).then(
         (cached) => cached || (offlineFallback ? caches.match(offlineFallback) : undefined)
       )

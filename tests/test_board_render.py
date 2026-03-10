@@ -10,6 +10,7 @@ from app.models import SubTask, Task
 
 
 def test_board_renders_subtask_progress(app, client, create_user):
+    """ボード上でサブタスク進捗とカード操作用属性が表示されることを確認する。"""
     user = create_user("board_user", "password123")
 
     with app.app_context():

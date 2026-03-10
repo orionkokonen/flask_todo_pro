@@ -89,6 +89,8 @@
     </div>
 
     <form id="filterForm" method="get" class="row gy-3 gx-3 align-items-end">
+      {# select は app.js が変更時に自動送信する。
+         検索欄だけは入力途中で飛ばないよう、明示的にボタン送信も残している。 #}
       <div class="col-12 col-md-4">
         <label class="form-label" for="boardSearch">検索</label>
         <input id="boardSearch" class="form-control" type="search" name="q" value="{{ q }}" placeholder="タイトルや説明で検索">

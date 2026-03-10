@@ -9,8 +9,12 @@
   <link rel="icon" href="/static/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <title>ToDo Pro{% block title %}{% endblock %}</title>
+  {# vendor はローカル配信に統一。
+     外部 CDN に依存しないので、オフライン時や通信制限時でも崩れにくい。 #}
   <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
+  {# `v=` は簡易的な版番号。
+     CSS を更新したのに古いキャッシュが残る問題を起こしにくくするため付けている。 #}
   <link href="{{ url_for('static', filename='css/app.css', v='20260308-1') }}" rel="stylesheet">
   {% block head %}{% endblock %}
 </head>
@@ -119,6 +123,7 @@
 
 {# Bootstrap の部品と、自作のふるまい（確認ダイアログ・カード全体クリックなど）を最後に読む。 #}
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+{# JS 側も `v=` を変えるだけで「新しいファイルを取りに行ってほしい」とブラウザへ伝えやすい。 #}
 <script src="{{ url_for('static', filename='js/app.js', v='20260304-2') }}"></script>
 {% block scripts %}{% endblock %}
 </body>

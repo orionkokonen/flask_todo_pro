@@ -26,6 +26,12 @@ def utc_now() -> datetime:
 
 
 class Team(db.Model):
+    """ユーザーをまとめる共有単位。
+
+    何のためにあるか:
+    - 個人タスクとは別に、複数人で同じプロジェクトを扱えるようにするため。
+    - owner_id を持たせることで「誰が管理者か」をはっきり決められる。
+    """
     __tablename__ = "team"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -57,6 +63,11 @@ class Team(db.Model):
 
 
 class TeamMember(db.Model):
+    """Team と User をつなぐ中間テーブル。
+
+    Team と User は「多対多」（1人が複数チーム、1チームに複数人）なので、
+    間にこの表を挟んで「誰がどのチームに、どんな役割で入っているか」を記録する。
+    """
     __tablename__ = "team_member"
 
     # team_id + user_id を複合主キー（2列でユニーク）にし、同じユーザーの二重登録を DB レベルで防ぐ
@@ -83,6 +94,11 @@ class TeamMember(db.Model):
 
 
 class User(UserMixin, db.Model):
+    """ログインできる利用者。
+
+    UserMixin は Flask-Login が必要とする基本機能をまとめた部品で、
+    これを継承すると「ログイン中か」「この ID は誰か」を Flask 側が扱いやすくなる。
+    """
     __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -137,6 +153,11 @@ def load_user(user_id: str):
 
 
 class Project(db.Model):
+    """タスクをひとまとまりにする入れ物。
+
+    team_id があればチーム共有、無ければ個人用という 2 つの使い方を
+    1 つのモデルで表している。
+    """
     __tablename__ = "project"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -162,13 +183,16 @@ class Project(db.Model):
 
     @property
     def is_team(self) -> bool:
+        """チーム共有プロジェクトかどうか。"""
         return self.team_id is not None
 
     @property
     def is_personal(self) -> bool:
+        """個人プロジェクトかどうか。"""
         return self.team_id is None
 
     def scope_label(self) -> str:
+        """画面表示用に「個人 / チーム」の短いラベルを返す。"""
         return "チーム" if self.team_id else "個人"
 
     def can_access(self, user: User) -> bool:
@@ -190,6 +214,12 @@ class Project(db.Model):
 
 
 class Task(db.Model):
+    """ボード上で管理する中心の作業項目。
+
+    期限・状態・所属プロジェクトを持たせることで、
+    「今やること」「進行中」「完了」「いつかやりたいこと」を
+    1 つの型で統一して扱えるようにしている。
+    """
     __tablename__ = "task"
 
     # ステータス名を定数にまとめると、表記ゆれや打ち間違いを防ぎやすい。
@@ -232,10 +262,12 @@ class Task(db.Model):
 
     @property
     def is_wish(self) -> bool:
+        """Wish 列に置くタスクかどうか。"""
         return self.status == self.STATUS_WISH
 
     @property
     def is_done(self) -> bool:
+        """完了済みかどうか。"""
         return self.status == self.STATUS_DONE
 
     @property
@@ -277,6 +309,11 @@ class Task(db.Model):
 
 
 class SubTask(db.Model):
+    """Task をさらに小さく分けた 1 手順。
+
+    大きなタスクを細かいステップへ分けると、
+    進み具合を見失いにくくなり、ボード上でも進捗率を表示できる。
+    """
     __tablename__ = "subtask"
 
     id = db.Column(db.Integer, primary_key=True)

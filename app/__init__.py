@@ -74,6 +74,8 @@ def create_app(config_overrides: dict[str, Any] | None = None):
     """
     app = Flask(__name__)
     app.config.from_object(Config)
+    # DB 接続先は環境変数があれば本番DB、無ければローカル SQLite を使う。
+    # ここを 1 行にまとめておくと、接続先の決め方を app 側で迷わず追える。
     app.config["SQLALCHEMY_DATABASE_URI"] = Config.database_uri()
 
     # 環境変数の SECRET_KEY があれば設定に反映する。

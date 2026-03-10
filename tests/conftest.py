@@ -81,16 +81,23 @@ def app(app_factory):
 
 @pytest.fixture
 def client(app):
+    """Flask のテスト用ブラウザを返す。
+
+    `client.get()` や `client.post()` で HTTP 通信をまねできるので、
+    画面操作に近い形でアプリのふるまいを確かめられる。
+    """
     return app.test_client()
 
 
 @pytest.fixture
 def csrf_app(app_factory):
+    """CSRF 検証を有効にしたアプリを返す。"""
     return app_factory({"WTF_CSRF_ENABLED": True})
 
 
 @pytest.fixture
 def csrf_client(csrf_app):
+    """CSRF 有効アプリに対するテスト用クライアント。"""
     return csrf_app.test_client()
 
 
@@ -115,6 +122,7 @@ def _detached(model, object_id: int):
 
 @pytest.fixture
 def create_user(app):
+    """テスト用ユーザーを手早く作るヘルパー fixture。"""
     def _create_user(username: str, password: str) -> User:
         with app.app_context():
             user = User(username=username)
@@ -132,6 +140,7 @@ def create_user(app):
 
 @pytest.fixture
 def login(client):
+    """ログイン POST を 1 行で呼べるようにするヘルパー fixture。"""
     def _login(username: str, password: str, next_path: str | None = None, follow_redirects: bool = False):
         path = "/auth/login"
         if next_path:
@@ -147,6 +156,7 @@ def login(client):
 
 @pytest.fixture
 def create_team(app):
+    """テスト用チームを作るヘルパー fixture。"""
     def _create_team(owner: User | int, members: Iterable[User | int] | None = None, name: str = "Team") -> Team:
         with app.app_context():
             owner_id = _model_id(owner)
@@ -173,6 +183,7 @@ def create_team(app):
 
 @pytest.fixture
 def create_project(app):
+    """テスト用プロジェクトを作るヘルパー fixture。"""
     def _create_project(
         owner: User | int,
         team: Team | int | None = None,
@@ -201,6 +212,7 @@ def create_project(app):
 
 @pytest.fixture
 def create_task(app):
+    """テスト用タスクを作るヘルパー fixture。"""
     def _create_task(created_by: User | int, project: Project | int | None = None, **overrides: Any) -> Task:
         with app.app_context():
             project_obj = None

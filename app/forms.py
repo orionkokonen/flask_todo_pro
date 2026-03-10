@@ -87,6 +87,7 @@ class RegistrationForm(FlaskForm):
         require_symbol = current_app.config.get("PASSWORD_REQUIRE_SYMBOL", False)
 
         # ON になっている条件だけエラーメッセージに含め、ユーザーに何が足りないか伝える
+        # ここを設定値から組み立てると、条件を変えても文言だけ古いまま残りにくい。
         requirements = []
         if require_upper:
             requirements.append("英大文字")

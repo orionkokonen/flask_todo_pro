@@ -16,6 +16,7 @@ def test_board_displays_due_date_states(
     create_user,
     login,
 ):
+    """ボードでは締切の近さが言葉で分かるように表示されることを確認する。"""
     user = create_user("due_board_user", "password123")
     today = date.today()
 
@@ -51,6 +52,7 @@ def test_task_detail_displays_due_date_state(
     offset_days,
     expected_label,
 ):
+    """詳細画面でも締切状態がボードと同じ考え方で表示されることを確認する。"""
     username = f"detail_due_user_{offset_days}"
     user = create_user(username, "password123")
     due_date = date.today() + timedelta(days=offset_days)

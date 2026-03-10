@@ -1,6 +1,8 @@
 // アプリ全体で使う共通 JS をまとめたモジュール。
 // IIFE（即時実行関数）でスコープを閉じて、グローバル変数の汚染を防ぐ。
 (function(){
+  // よく使う DOM 取得を短く書くための小さなヘルパー。
+  // 処理本体の意図を読みやすくし、毎回同じ長い式を書かないために置いている。
   const any = (sel) => document.querySelector(sel);
   const all = (sel) => Array.from(document.querySelectorAll(sel));
   // js-task-card-link クラスを持つカード要素をクリック可能領域として扱うためのセレクター。

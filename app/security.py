@@ -26,6 +26,9 @@ class SimpleRateLimiter:
     """
 
     def __init__(self) -> None:
+        # `_entries` の形:
+        # {"login:127.0.0.1": [失敗時刻, 失敗時刻, ...]}
+        # という対応表にしておくと、「誰の何回目か」を素直に追える。
         self._entries: dict[str, deque[float]] = {}
         # 複数リクエストが同時に来ても _entries を壊さないための排他ロック
         self._lock = Lock()

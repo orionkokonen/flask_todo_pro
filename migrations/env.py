@@ -23,6 +23,11 @@ def get_engine():
 
 
 def get_engine_url():
+    """Alembic が使う DB 接続文字列を取り出す。
+
+    `%` を `%%` に置き換えているのは、Alembic の設定パーサが
+    `%` を特別な記号として読むため。そのままだと URL 解釈で崩れることがある。
+    """
     try:
         return get_engine().url.render_as_string(hide_password=False).replace(
             '%', '%%')
@@ -36,6 +41,11 @@ config.set_main_option('sqlalchemy.url', get_engine_url())
 target_db = current_app.extensions['migrate'].db
 
 def get_metadata():
+    """マイグレーション比較に使う SQLAlchemy のメタデータを返す。
+
+    メタデータは「どんなテーブルや列があるか」という設計図。
+    ここを Alembic に渡すことで、モデルと DB の差分を自動比較できる。
+    """
     if hasattr(target_db, 'metadatas'):
         return target_db.metadatas[None]
     return target_db.metadata
@@ -58,6 +68,11 @@ def run_migrations_online():
     # autogenerate時に差分がない場合はリビジョンファイルを作らない。
     # 「空マイグレーション」の蓄積を防ぎ、履歴の可読性を維持する。
     def process_revision_directives(context, revision, directives):
+        """差分が空なら新しい migration ファイルを作らない。
+
+        何も変わっていないのに空ファイルだけ増えると、
+        後から履歴を読む人が「本当に必要な変更」を見つけにくくなる。
+        """
         if getattr(config.cmd_opts, 'autogenerate', False):
             script = directives[0]
             if script.upgrade_ops.is_empty():
