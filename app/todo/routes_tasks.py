@@ -66,14 +66,18 @@ def task_new():
     preset_status = (request.args.get("status") or "").upper()
     if request.method == "GET" and preset_status in Task.VALID_STATUSES:
         form.status.data = preset_status
-    # 送信値の偽装はフォーム検証とは別問題なので、POST が来た時点で先に止める。
+    # フォームの「必須かどうか」と、
+    # 「その project を本当に使ってよいか」は別の確認ポイント。
+    # 後者は権限の話なので、POST が来た時点で先に止める。
     if request.method == "POST":
         posted_project = _posted_project_or_abort()
 
     if form.validate_on_submit():
         project = posted_project
         # _posted_project_or_abort() が None を返した場合（project_id 未選択）は
-        # そのまま None を使う。POST 改ざんチェックは既に完了している。
+        # 「プロジェクトなし」のタスクとして保存する。
+        # ここで再チェックしないのは、権限確認を 1 か所へ集めて
+        # 読みやすくし、チェック漏れや二重実装を防ぐため。
 
         task = Task(
             title=form.title.data,

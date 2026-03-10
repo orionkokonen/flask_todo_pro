@@ -11,7 +11,9 @@
   </div>
   <div class="d-flex gap-2">
     {% if current_user.id == team.owner_id %}
-      {# data-confirm: 誤削除防止の確認ダイアログ。hidden_tag() で CSRF トークンを送る。 #}
+      {# owner にだけ削除ボタンを見せる。
+         data-confirm は「押し間違い」を減らすための確認ダイアログ。
+         hidden_tag() は CSRF 対策で、「他サイトから勝手に送られた POST ではないか」を確かめる。 #}
       <form method="post" action="{{ url_for('todo.team_delete', team_id=team.id) }}" data-confirm="このチームを削除しますか？関連するプロジェクトも全て削除されます。">
         {{ delete_form.hidden_tag() }}
         <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> チームを削除</button>

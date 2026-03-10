@@ -27,13 +27,18 @@ _TIMING_EQUALIZATION_HASH = generate_password_hash("dummy-timing-pad", method="s
 def _client_ip() -> str:
     """アクセス元の IP アドレスを返す。
 
-    レート制限は「誰から来た試行か」を区別したいので、ここで IP を使う。
-    本番で ProxyFix を有効にしていれば、プロキシの向こう側にいる元の利用者の IP が入る。
+    レート制限では「どの利用者から何回試されたか」を見分けたいので、
+    ここで IP アドレスを 1 つに決めて返す。
+    本番で ProxyFix を有効にしていれば、プロキシ（代理で受け取るサーバー）の
+    向こう側にいる元の利用者の IP が request.remote_addr に入る。
     """
     if request.remote_addr:
         return request.remote_addr
-    # ProxyFix が無効な環境でも X-Forwarded-For から取得を試みる。
+    # 開発環境や設定漏れで ProxyFix が効いていない場合でも、
+    # プロキシが付けた X-Forwarded-For から元の利用者らしい IP を拾っておく。
+    # 先頭を使うのは、一般に「いちばん最初の値 = 元の送信元」として扱うため。
     forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    # 何も取れなかった場合も必ず文字列を返し、呼び出し側で None 対応を書かなくて済むようにする。
     return forwarded_for or "0.0.0.0"
 
 
@@ -110,6 +115,8 @@ def register():
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("user registration")
+            # 画面には細かい失敗理由を出さず、運用者だけが追えるようにログへ残す。
+            # username と IP を残しておくと、「誰が」「どこから」失敗したかを後で調べやすい。
             current_app.logger.warning(
                 "register failed: username=%s ip=%s",
                 form.username.data,
@@ -123,6 +130,8 @@ def register():
         # ここで毎回リセットすると、短時間に大量アカウントを作るボットを
         # 実質的に通しやすくしてしまうため。
         # 登録直後に自動ログインし、再入力の手間を省く。
+        # 成功ログは「あとで追跡するための記録」。画面表示用ではなく、
+        # 監査（あとから操作履歴を確認すること）や不正調査で役立つ。
         current_app.logger.info(
             "register succeeded: user_id=%s username=%s ip=%s",
             user.id,

@@ -190,7 +190,10 @@ def test_team_detail_shows_delete_button_only_for_owner(
     create_user,
     login,
 ):
-    """チーム削除ボタンは owner のみに表示され、通常メンバーには表示されない。"""
+    """チーム削除ボタンは owner のみに表示され、通常メンバーには表示されない。
+
+    サーバー側の権限チェックが本命だが、画面側でも危険な操作をむやみに見せない。
+    """
     owner = create_user("team_delete_owner", "password123")
     member = create_user("team_delete_member", "password123")
     team = create_team(owner, members=[member], name="Delete Team")
@@ -200,6 +203,7 @@ def test_team_detail_shows_delete_button_only_for_owner(
 
     owner_response = client.get(f"/todo/teams/{team.id}")
     assert owner_response.status_code == 200
+    # owner には削除フォームが見える。
     assert f'/todo/teams/{team.id}/delete' in owner_response.get_data(as_text=True)
 
     _logout(client)
@@ -209,6 +213,7 @@ def test_team_detail_shows_delete_button_only_for_owner(
 
     member_response = client.get(f"/todo/teams/{team.id}")
     assert member_response.status_code == 200
+    # 通常メンバーには危険な操作を見せない。
     assert f'/todo/teams/{team.id}/delete' not in member_response.get_data(as_text=True)
 
 
@@ -221,7 +226,11 @@ def test_team_delete_removes_team_and_related_projects(
     create_user,
     login,
 ):
-    """owner がチーム削除でき、関連プロジェクトとタスクも cascade で消える。"""
+    """owner がチーム削除でき、関連プロジェクトとタスクも cascade で消える。
+
+    「親のデータを消したら子のデータも一緒に消える」連動削除が
+    想定どおり動くかを確認する。
+    """
     owner = create_user("cascade_owner", "password123")
     team = create_team(owner, name="Cascade Team")
     project = create_project(owner, team=team, name="Cascade Project")
@@ -240,6 +249,7 @@ def test_team_delete_removes_team_and_related_projects(
     assert response.headers["Location"].endswith("/todo/teams")
 
     with app.app_context():
+        # チームだけ残骸が消えずに残ると、後で壊れた参照が増えるので一緒に確認する。
         assert db.session.get(Project, project.id) is None
         assert db.session.get(Task, task.id) is None
         assert db.session.get(type(team), team.id) is None
@@ -254,7 +264,10 @@ def test_team_delete_forbidden_for_member_and_logs_warning(
     login,
     caplog,
 ):
-    """owner 以外のメンバーによるチーム削除は 403 で拒否し、監査ログに残す。"""
+    """owner 以外のメンバーによるチーム削除は 403 で拒否し、監査ログに残す。
+
+    「中にいる人なら誰でも削除できる」状態を防ぐためのテスト。
+    """
     owner = create_user("delete_forbidden_owner", "password123")
     member = create_user("delete_forbidden_member", "password123")
     team = create_team(owner, members=[member], name="Forbidden Team")
@@ -287,7 +300,10 @@ def test_team_delete_blocks_outsider_and_logs_warning(
     login,
     caplog,
 ):
-    """非メンバーのチーム削除は 403 で拒否し、理由をログへ残す。"""
+    """非メンバーのチーム削除は 403 で拒否し、理由をログへ残す。
+
+    部外者が URL を直接たたいても削除できないことを確認する。
+    """
     owner = create_user("delete_outsider_owner", "password123")
     create_user("delete_outsider_user", "password123")
     team = create_team(owner, name="Outsider Team")

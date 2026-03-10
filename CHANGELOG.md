@@ -110,19 +110,30 @@
 - `app/auth/routes.py` のタイミング調整用ダミーハッシュ定数を `_TIMING_EQUALIZATION_HASH` に改名し、用途が読み取りやすい名前へ整理。
 - `app/todo/routes_tasks.py` の `task_edit` でも `Task.VALID_STATUSES` を検証し、編集画面経由で不正な status を直接送られても `400` で拒否するよう補強。
 - `app/__init__.py` に 403 / 404 / 500 のアプリ全体エラーハンドラを追加し、素のエラーページではなく固定の利用者向け画面を返すように変更。
+- `render.yaml` に `PROXY_FIX_TRUSTED_HOPS=1` を追加し、Render 配下でもレート制限が元のクライアント IP を基準に動きやすいよう調整。
+- `app/auth/routes.py` の `_client_ip()` を見直し、`remote_addr` が取れない場合でも `X-Forwarded-For` を使って IP を拾い、それも無理なら固定値へ安全にフォールバックするよう変更。
+- `app/todo/routes_tasks.py` の `task_new()` で、POST 時の `project` 権限確認を `_posted_project_or_abort()` に一本化し、認可ロジックの二重化を解消。
+- `app/todo/routes_teams.py` にチーム削除ルートを追加し、非メンバー / 非 owner の削除試行を `403` で拒否して警告ログへ残すよう補強。
 
 ### Added
 
 - `app/templates/errors/403.html` / `app/templates/errors/404.html` / `app/templates/errors/500.html` を新規追加し、権限不足・URL誤り・内部エラー時の案内ページを用意。
 - `tests/test_task_crud.py` に、他ユーザーのタスク詳細閲覧・編集・削除がいずれも `403` になる回帰テストを追加。
 - `tests/_runtime_tmp/.gitkeep` を追加し、テスト用の repo ローカル一時領域を明示。
+- `.github/workflows/test.yml` を新規追加し、`master` 向け `push` / `pull_request` で Python 3.11 / 3.12 の `pytest tests/ -v` を実行する GitHub Actions CI を構成。
+- `app/auth/routes.py` に登録成功 / 失敗の監査ログを追加し、ユーザー作成まわりの追跡性を向上。
+- `app/todo/templates/todo/team_detail.html` に owner 限定のチーム削除ボタンを追加し、CSRF トークンと確認ダイアログ付きで危険な操作を明示。
+- `tests/test_auth_security.py` に登録監査ログの回帰テストを追加。
+- `tests/test_team_access_control.py` に、チーム削除ボタン表示、owner による削除成功、メンバー / 非メンバーの削除拒否ログの回帰テストを追加。
 
 ### Changed
 
 - `app/todo/routes_teams.py` の `team_detail` に、メンバー追加が「既存メンバー全員に許可された招待制」であることを説明するコメントを追加。
 - `tests/test_auth_security.py` のダミーハッシュ照合テストを、定数名変更に合わせて更新。
 - `tests/conftest.py` の一時 DB 作成先を pytest 標準の `tmp_path` 依存から repo ローカル領域へ切り替え、この実行環境での権限エラーを避けつつテスト独立性を保つ構成に変更。
+- 今回追加・変更した実装箇所に、学習用の日本語コメント / docstring を追記・整理し、「何を守る処理か」「なぜ必要か」が初心者でも追いやすい形に整備。
 
 ### Docs
 
 - 回帰確認として `.venv_work\\Scripts\\python.exe -m pytest tests/ -v` を実行し、`60 passed, 1 warning` を確認。
+- 追加実装後の回帰確認として `.venv_work\\Scripts\\python.exe -m pytest tests/ -v` を複数回実行し、最終的に `66 passed, 1 warning` を確認。
