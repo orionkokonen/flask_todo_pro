@@ -65,7 +65,6 @@ def team_detail(team_id: int):
 
     form = AddMemberForm()
     remove_form = EmptyForm()
-    delete_form = EmptyForm()
     # メンバー一覧を owner が先頭、その後ユーザー名の昇順で取得
     members = (
         TeamMember.query.filter_by(team_id=team.id)
@@ -117,7 +116,6 @@ def team_detail(team_id: int):
                 team=team,
                 members=members,
                 form=form,
-                delete_form=delete_form,
                 remove_form=remove_form,
             )
         flash("メンバーを追加しました。")
@@ -128,41 +126,8 @@ def team_detail(team_id: int):
         team=team,
         members=members,
         form=form,
-        delete_form=delete_form,
         remove_form=remove_form,
     )
-
-
-@bp.route("/teams/<int:team_id>/delete", methods=["POST"])
-@login_required
-def team_delete(team_id: int):
-    """チームを削除する（チームオーナーのみ実行可能）。"""
-    team = get_or_404(Team, team_id)
-    if not TeamMember.is_member(current_user.id, team.id):
-        current_app.logger.warning(
-            "team delete forbidden: user_id=%s team_id=%s reason=not_member",
-            current_user.id,
-            team.id,
-        )
-        abort(403)
-
-    if current_user.id != team.owner_id:
-        current_app.logger.warning(
-            "team delete forbidden: user_id=%s team_id=%s reason=not_owner",
-            current_user.id,
-            team.id,
-        )
-        abort(403)
-
-    try:
-        db.session.delete(team)
-        db.session.commit()
-    except SQLAlchemyError:
-        rollback_session("team delete")
-        flash("チーム削除に失敗しました。時間を置いて再試行してください。", "danger")
-        return redirect(url_for("todo.team_detail", team_id=team.id))
-    flash("チームを削除しました。")
-    return redirect(url_for("todo.teams"))
 
 
 @bp.route("/teams/<int:team_id>/members/<int:user_id>/remove", methods=["POST"])

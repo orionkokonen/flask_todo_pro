@@ -10,13 +10,6 @@
     <div class="text-secondary small">メンバー数: {{ members|length }}人</div>
   </div>
   <div class="d-flex gap-2">
-    {% if current_user.id == team.owner_id %}
-      {# data-confirm: 誤削除防止の確認ダイアログ。hidden_tag() で CSRF トークンを送る。 #}
-      <form method="post" action="{{ url_for('todo.team_delete', team_id=team.id) }}" data-confirm="このチームを削除しますか？関連するプロジェクトも全て削除されます。">
-        {{ delete_form.hidden_tag() }}
-        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> チームを削除</button>
-      </form>
-    {% endif %}
     <a class="btn btn-outline-secondary" href="{{ url_for('todo.teams') }}"><i class="bi bi-arrow-left"></i> 一覧へ</a>
   </div>
 </div>

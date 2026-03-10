@@ -30,11 +30,7 @@ def _client_ip() -> str:
     レート制限は「誰から来た試行か」を区別したいので、ここで IP を使う。
     本番で ProxyFix を有効にしていれば、プロキシの向こう側にいる元の利用者の IP が入る。
     """
-    if request.remote_addr:
-        return request.remote_addr
-    # ProxyFix が無効な環境でも X-Forwarded-For から取得を試みる。
-    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    return forwarded_for or "0.0.0.0"
+    return request.remote_addr or "unknown"
 
 
 def _render_auth_template(
@@ -110,11 +106,6 @@ def register():
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("user registration")
-            current_app.logger.warning(
-                "register failed: username=%s ip=%s",
-                form.username.data,
-                _client_ip(),
-            )
             # 画面には原因を細かく出さず、入力見直しを促す文言だけ返す。
             # 詳細は rollback_session() 側のログへ残す。
             flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
@@ -123,12 +114,6 @@ def register():
         # ここで毎回リセットすると、短時間に大量アカウントを作るボットを
         # 実質的に通しやすくしてしまうため。
         # 登録直後に自動ログインし、再入力の手間を省く。
-        current_app.logger.info(
-            "register succeeded: user_id=%s username=%s ip=%s",
-            user.id,
-            user.username,
-            _client_ip(),
-        )
         login_user(user)
         flash("登録が完了しました。ログインしました。")
         # 登録後は固定ページへ飛ばす。next パラメータを使わないのは Open Redirect 対策。
