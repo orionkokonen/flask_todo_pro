@@ -97,7 +97,7 @@ def test_login_failure_writes_audit_log(client, create_user, caplog):
 
 
 def test_login_unknown_user_runs_dummy_hash_check(client, monkeypatch):
-    """存在しないユーザーでもダミーのハッシュ照合を通すことを確認する。
+    """存在しないユーザーでもタイミング調整用ハッシュで照合することを確認する。
 
     「存在する時だけ照合する」実装だと処理時間の差から
     アカウント有無を推測されやすくなるため、その差を小さくする仕組みの確認。
@@ -233,8 +233,8 @@ def test_register_logs_in_user_and_shows_success_flash(client):
     「登録 → ログイン」と 2 ステップ踏まなくてよい UX 設計が
     正しく機能しているかのリグレッションテスト。
     """
-    # 登録成功時に表示される期待メッセージを、読みやすいように変数へ切り出す。
-    # この固定文字列と実際のレスポンスを比較することで、文言変更時にテストが失敗して検知できる。
+    # 文言を変数へ出しておくと、「何を期待しているテストか」が読み取りやすい。
+    # 画面の文言が意図せず変わった時も、この比較で気づける。
     success_message = (
         "\u767b\u9332\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\u3002"
         "\u30ed\u30b0\u30a4\u30f3\u3057\u307e\u3057\u305f\u3002"
@@ -253,9 +253,8 @@ def test_register_logs_in_user_and_shows_success_flash(client):
     assert response.status_code == 200
     assert success_message in response.get_data(as_text=True)
 
-    # 登録後にそのままボードへアクセスできる（ログイン済み）ことを確認する。
-    # ログインしていなければ /auth/login にリダイレクトされ 302 が返るため、
-    # 200 が返ることで「自動ログインが成功した」と判定できる。
+    # 登録後にそのままボードへアクセスできるなら、ログイン状態が作られていると分かる。
+    # 未ログインなら /auth/login へ飛ばされるはずなので、200 が返ること自体が確認材料になる。
     board_response = client.get("/todo/", follow_redirects=False)
 
     assert board_response.status_code == 200

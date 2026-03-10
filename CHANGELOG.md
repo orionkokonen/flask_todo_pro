@@ -100,3 +100,29 @@
 ### Docs
 
 - `README.md` にアーキテクチャ図、レイヤごとの責務、セキュリティ設計の要点を追記し、面接時に全体像と防御方針を説明しやすい構成へ更新。
+
+## [2026-03-10]
+
+### Fixed
+
+- `app/auth/routes.py` から未使用の `_is_safe_redirect_target` ラッパーを削除し、認証ルート側の役割を整理。
+- `app/auth/routes.py` で登録成功時に register 用レート制限カウンタを `reset()` しないよう変更し、短時間の連続アカウント作成を通しやすくしない構成に見直し。
+- `app/auth/routes.py` のタイミング調整用ダミーハッシュ定数を `_TIMING_EQUALIZATION_HASH` に改名し、用途が読み取りやすい名前へ整理。
+- `app/todo/routes_tasks.py` の `task_edit` でも `Task.VALID_STATUSES` を検証し、編集画面経由で不正な status を直接送られても `400` で拒否するよう補強。
+- `app/__init__.py` に 403 / 404 / 500 のアプリ全体エラーハンドラを追加し、素のエラーページではなく固定の利用者向け画面を返すように変更。
+
+### Added
+
+- `app/templates/errors/403.html` / `app/templates/errors/404.html` / `app/templates/errors/500.html` を新規追加し、権限不足・URL誤り・内部エラー時の案内ページを用意。
+- `tests/test_task_crud.py` に、他ユーザーのタスク詳細閲覧・編集・削除がいずれも `403` になる回帰テストを追加。
+- `tests/_runtime_tmp/.gitkeep` を追加し、テスト用の repo ローカル一時領域を明示。
+
+### Changed
+
+- `app/todo/routes_teams.py` の `team_detail` に、メンバー追加が「既存メンバー全員に許可された招待制」であることを説明するコメントを追加。
+- `tests/test_auth_security.py` のダミーハッシュ照合テストを、定数名変更に合わせて更新。
+- `tests/conftest.py` の一時 DB 作成先を pytest 標準の `tmp_path` 依存から repo ローカル領域へ切り替え、この実行環境での権限エラーを避けつつテスト独立性を保つ構成に変更。
+
+### Docs
+
+- 回帰確認として `.venv_work\\Scripts\\python.exe -m pytest tests/ -v` を実行し、`60 passed, 1 warning` を確認。

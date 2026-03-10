@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>500 - サーバーエラー | ToDo Pro</title>
+  <!-- 500 では内部エラーの詳細を見せず、利用者向けの案内だけ返す。 -->
   <style>
     body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8f9fa; color: #333; }
     .error-box { text-align: center; padding: 2rem; }
@@ -15,6 +16,7 @@
 <body>
   <div class="error-box">
     <h1>500</h1>
+    <!-- 詳細を隠すのは、利用者を混乱させず内部情報の露出も避けるため。 -->
     <p>サーバー内部でエラーが発生しました。時間を置いて再度お試しください。</p>
     <a href="/">トップへ戻る</a>
   </div>

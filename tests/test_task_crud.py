@@ -333,7 +333,11 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
 
 
 def test_other_user_cannot_edit_task(app, client, create_user, create_task, login):
-    """他人のタスクを編集しようとすると 403 が返る。"""
+    """他人のタスクを編集しようとすると 403 が返る。
+
+    「URL を知っていれば編集画面が開ける」状態になっていないかを確認する、
+    権限チェックの回帰テスト。
+    """
     owner = create_user("owner", "OwnerPass1234")
     other = create_user("other", "OtherPass1234")
     task = create_task(created_by=owner, title="Owner Task")
@@ -344,7 +348,11 @@ def test_other_user_cannot_edit_task(app, client, create_user, create_task, logi
 
 
 def test_other_user_cannot_delete_task(app, client, create_user, create_task, login):
-    """他人のタスクを削除しようとすると 403 が返る。"""
+    """他人のタスクを削除しようとすると 403 が返る。
+
+    削除は影響が大きい操作なので、一覧に見えていないだけでなく
+    サーバー側でも確実に止めているかを見る。
+    """
     owner = create_user("owner", "OwnerPass1234")
     other = create_user("other", "OtherPass1234")
     task = create_task(created_by=owner, title="Owner Task")
@@ -355,7 +363,10 @@ def test_other_user_cannot_delete_task(app, client, create_user, create_task, lo
 
 
 def test_other_user_cannot_view_task_detail(app, client, create_user, create_task, login):
-    """他人のタスク詳細を閲覧しようとすると 403 が返る。"""
+    """他人のタスク詳細を閲覧しようとすると 403 が返る。
+
+    編集や削除だけでなく、内容ののぞき見自体も防げているかを確認する。
+    """
     owner = create_user("owner", "OwnerPass1234")
     other = create_user("other", "OtherPass1234")
     task = create_task(created_by=owner, title="Owner Task")

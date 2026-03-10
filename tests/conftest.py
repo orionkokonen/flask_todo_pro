@@ -23,6 +23,8 @@ from app.models import Project, Task, Team, TeamMember, User
 from app.security import auth_rate_limiter
 
 
+# pytest 標準の tmp_path は、この実行環境では権限エラーになることがあった。
+# そのため repo 配下にテスト専用の作業場所を用意し、毎回そこへ一時 DB を作る。
 TEST_RUNTIME_ROOT = Path(__file__).resolve().parent / "_runtime_tmp"
 TEST_RUNTIME_ROOT.mkdir(exist_ok=True)
 
@@ -46,10 +48,13 @@ def app_factory():
     テスト間でデータが混入しない。
     """
     created_apps = []
+    # テストごとにランダムな作業用フォルダを切る。
+    # こうしておくと、前回実行の残りや複数テストの DB が混ざりにくい。
     run_dir = TEST_RUNTIME_ROOT / uuid4().hex
     run_dir.mkdir()
 
     def _create_app(overrides: dict[str, Any] | None = None):
+        # 1 テストの中で複数アプリを作る場合もあるため、DB ファイル名を順番にずらす。
         database_path = run_dir / f"test_{len(created_apps)}.db"
         config = {
             "TESTING": True,
@@ -74,6 +79,7 @@ def app_factory():
             db.session.remove()
             db.drop_all()
 
+    # DB ファイルごと最後に片づけ、次のテストへ状態を持ち越さない。
     shutil.rmtree(run_dir, ignore_errors=True)
 
 

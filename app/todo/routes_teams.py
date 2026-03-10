@@ -73,8 +73,9 @@ def team_detail(team_id: int):
         .all()
     )
 
-    # POST: ユーザー名を入力してメンバーを追加する
-    # メンバー追加はチームメンバー全員に許可する設計（招待制）。
+    # POST: ユーザー名を入力してメンバーを追加する。
+    # このアプリでは「既に中にいる人が次の人を招待できる」設計にしている。
+    # 小さなチームで素早く増やしやすい反面、管理を厳しくしたい場合は owner 限定へ変える。
     # owner 限定にする場合は、ここに owner_id チェックを追加する。
     if form.validate_on_submit():
         username = form.username.data.strip()

@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>403 - アクセス拒否 | ToDo Pro</title>
+  <!-- ベーステンプレートを使わず単独ページにしているのは、
+       エラー発生中でも最小構成で確実に表示したいため。 -->
   <style>
     body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8f9fa; color: #333; }
     .error-box { text-align: center; padding: 2rem; }
@@ -15,6 +17,7 @@
 <body>
   <div class="error-box">
     <h1>403</h1>
+    <!-- 403 は「ログイン不足」ではなく「権限が足りない」を伝える番号。 -->
     <p>このページへのアクセス権がありません。</p>
     <a href="/">トップへ戻る</a>
   </div>

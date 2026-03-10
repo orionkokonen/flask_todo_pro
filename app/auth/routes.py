@@ -78,7 +78,8 @@ def _rate_limited_response(template_name: str, form, retry_after: int):
 def register():
     """ユーザー登録ページ。
 
-    入力チェック、レート制限、保存失敗時の後片づけまでを 1 つの流れとして扱う。
+    入力チェック、レート制限、保存失敗時の後片づけまでを
+    1 つの流れとしてまとめている。
     """
     form = RegistrationForm()
     # bucket は「この IP の登録試行回数」を数えるための名前。
@@ -109,6 +110,9 @@ def register():
             # 詳細は rollback_session() 側のログへ残す。
             flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
             return _render_auth_template("auth/register.html", form)
+        # 登録成功時も register 用の失敗回数は消さない。
+        # ここで毎回リセットすると、短時間に大量アカウントを作るボットを
+        # 実質的に通しやすくしてしまうため。
         # 登録直後に自動ログインし、再入力の手間を省く。
         login_user(user)
         flash("登録が完了しました。ログインしました。")
@@ -150,7 +154,8 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         password_matches = False
         if user is None:
-            # 結果は使わず、「照合処理を通った」という事実だけをそろえる。
+            # 結果は使わず、「照合処理にかかった重さ」だけをそろえる。
+            # これで「存在しないユーザーだけ極端に速く終わる」差を小さくする。
             check_password_hash(_TIMING_EQUALIZATION_HASH, form.password.data)
         else:
             password_matches = user.check_password(form.password.data)

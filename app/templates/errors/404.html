@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>404 - ページが見つかりません | ToDo Pro</title>
+  <!-- 単独の静かな画面にして、存在しない URL でも余計な情報を出さないようにする。 -->
   <style>
     body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f8f9fa; color: #333; }
     .error-box { text-align: center; padding: 2rem; }
@@ -15,6 +16,7 @@
 <body>
   <div class="error-box">
     <h1>404</h1>
+    <!-- URL の打ち間違いでも、利用者が次の行動に迷わないようトップ導線を残す。 -->
     <p>お探しのページは見つかりませんでした。</p>
     <a href="/">トップへ戻る</a>
   </div>

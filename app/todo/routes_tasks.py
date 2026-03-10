@@ -162,6 +162,8 @@ def task_edit(task_id: int):
 
         task.title = form.title.data
         task.description = form.description.data or ""
+        # status も hidden input などで送信値を書き換えられるので、
+        # 編集画面でも「許可された状態か」をサーバー側で必ず再確認する。
         if form.status.data not in Task.VALID_STATUSES:
             abort(400)
         task.status = form.status.data
