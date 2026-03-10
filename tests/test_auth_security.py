@@ -260,6 +260,25 @@ def test_register_logs_in_user_and_shows_success_flash(client):
     assert board_response.status_code == 200
 
 
+def test_register_success_writes_audit_log(client, caplog):
+    """登録成功時に監査ログを書き、作成ユーザー名が記録されることを確認する。"""
+    caplog.set_level(logging.INFO)
+
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "register_audit_success",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert "register succeeded:" in caplog.text
+    assert "username=register_audit_success" in caplog.text
+
+
 def test_register_stores_password_hash_with_scrypt(app, client):
     """登録時のパスワードハッシュ方式が scrypt で固定されていることを確認する。
 
@@ -367,3 +386,32 @@ def test_register_commit_error_rolls_back_and_shows_generic_flash(
         db.session.commit()
 
         assert User.query.filter_by(username="post_error_recovery_user").first() is not None
+
+
+def test_register_failure_writes_audit_log(client, monkeypatch, caplog):
+    """登録失敗時に監査ログを書き、失敗したユーザー名が記録されることを確認する。"""
+    original_commit = db.session.commit
+    state = {"failed_once": False}
+
+    def flaky_commit():
+        if not state["failed_once"]:
+            state["failed_once"] = True
+            raise SQLAlchemyError("forced failure")
+        return original_commit()
+
+    monkeypatch.setattr(db.session, "commit", flaky_commit)
+    caplog.set_level(logging.WARNING)
+
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "register_audit_failed",
+            "password": "StrongPass123",
+            "password2": "StrongPass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "register failed:" in caplog.text
+    assert "username=register_audit_failed" in caplog.text

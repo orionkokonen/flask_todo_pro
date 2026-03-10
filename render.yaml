@@ -1,25 +1,29 @@
 # render.yaml: Render Blueprint 用の公開設定。
-# 「どう起動し、どんな環境変数やDBを持つか」をコードとして残している。
+# どの外部サービス・環境変数で動かすかをコードとして残している。
 services:
   - type: web
     name: flask-todo-pro-pwa
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    # 起動前に migration を適用してからアプリを上げる。
-    # db upgrade は未適用分のみ実行されるため、毎回呼んでも基本的に安全。
+    # 起動時に migration を適用してからアプリを上げる。
+    # db upgrade は未適用の差分のみ処理されるため、毎回呼んでも問題ない。
     startCommand: bash -lc "python -m flask --app wsgi.py db upgrade && gunicorn wsgi:app --bind 0.0.0.0:$PORT"
     envVars:
       - key: SECRET_KEY
-        # Render がデプロイ時にランダムな値を自動生成する。手動設定が不要で、漏洩リスクも下がる。
+        # Render がデプロイ時にランダムな値を自動生成する。
+        # 固定値を避けることで、予測しやすいセッション秘密鍵になるのを防ぐ。
         generateValue: true
       - key: PYTHONUNBUFFERED
         # 標準出力をバッファしない設定。ログがリアルタイムで Render ダッシュボードに表示される。
         value: "1"
+      - key: PROXY_FIX_TRUSTED_HOPS
+        # Render のリバースプロキシを 1 段として扱い、レート制限が正しいクライアント IP で動作するようにする。
+        value: "1"
       - key: DATABASE_URL
         fromDatabase:
-          # Render Blueprint が Web サービスと Postgres を同時に作成し、接続文字列を自動注入する。
-          # アプリ側では DATABASE_URL 環境変数を読むだけでよく、接続先をコードに埋め込まない。
+          # Render Blueprint では Web サービスと Postgres を同時に定義し、接続文字列を注入する。
+          # アプリ側では DATABASE_URL が読めればよく、個別の接続情報をコードに埋め込まない。
           name: flask-todo-db
           property: connectionString
 
@@ -28,6 +32,6 @@ databases:
     plan: free
     databaseName: flask_todo
     user: flask_todo
-    # ipAllowList を空にすると Render 内部ネットワークからのみ接続を受け付ける。
-    # Web サービスと同一環境内で完結するため、外部 IP 許可は不要。
+    # ipAllowList を空にすると Render 内部ネットワークからのみ接続を受ける。
+    # Web サービスと同一環境で運用するため、外部 IP 許可は不要。
     ipAllowList: []

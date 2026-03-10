@@ -71,14 +71,9 @@ def task_new():
         posted_project = _posted_project_or_abort()
 
     if form.validate_on_submit():
-        # POST 直後に確認済みの project をここで再利用する。
-        # 先に止めた改ざんチェックを、保存直前まで保ったまま使うため。
         project = posted_project
-        if form.project_id.data is not None and project is None:
-            # 保存に使うのは form 側で正規化された値なので、ここでも同じ権限確認を通す。
-            project = get_or_404(Project, form.project_id.data)
-            # 他ユーザーのプロジェクトへ勝手にタスクを混ぜるのを防ぐ。
-            ensure_project_access(project)
+        # _posted_project_or_abort() が None を返した場合（project_id 未選択）は
+        # そのまま None を使う。POST 改ざんチェックは既に完了している。
 
         task = Task(
             title=form.title.data,
