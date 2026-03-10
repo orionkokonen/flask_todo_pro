@@ -65,8 +65,6 @@ def team_detail(team_id: int):
 
     form = AddMemberForm()
     remove_form = EmptyForm()
-    # 削除ボタンは表示だけ別でも、CSRF トークンは毎回必要なので専用フォームを渡す。
-    # EmptyForm は入力欄を持たず、「この POST はこの画面から送ったものか」を確かめる役目だけ持つ。
     delete_form = EmptyForm()
     # メンバー一覧を owner が先頭、その後ユーザー名の昇順で取得
     members = (
@@ -138,15 +136,8 @@ def team_detail(team_id: int):
 @bp.route("/teams/<int:team_id>/delete", methods=["POST"])
 @login_required
 def team_delete(team_id: int):
-    """チームを削除する（チームオーナーのみ実行可能）。
-
-    チームを消すと、その下にぶら下がるメンバー情報やプロジェクトも
-    まとめて消える。影響が大きい操作なので、
-    「チームの中にいるか」と「本当の管理者か」を分けて確認する。
-    """
+    """チームを削除する（チームオーナーのみ実行可能）。"""
     team = get_or_404(Team, team_id)
-    # URL を直接打ち込まれても、まずはチームメンバーかどうかを確認する。
-    # ここで止めると、部外者にチームの存在や詳細を余計に教えにくい。
     if not TeamMember.is_member(current_user.id, team.id):
         current_app.logger.warning(
             "team delete forbidden: user_id=%s team_id=%s reason=not_member",
@@ -155,8 +146,6 @@ def team_delete(team_id: int):
         )
         abort(403)
 
-    # メンバーであっても、削除は owner だけに限定する。
-    # 「見られる」と「消せる」は危険度が違うので、権限を分けている。
     if current_user.id != team.owner_id:
         current_app.logger.warning(
             "team delete forbidden: user_id=%s team_id=%s reason=not_owner",
@@ -166,12 +155,9 @@ def team_delete(team_id: int):
         abort(403)
 
     try:
-        # Team モデル側の cascade 設定により、
-        # チームにひもづくメンバー・プロジェクトも一緒に削除される。
         db.session.delete(team)
         db.session.commit()
     except SQLAlchemyError:
-        # 途中で失敗したら、セッションを元の安全な状態へ戻してから画面へ返す。
         rollback_session("team delete")
         flash("チーム削除に失敗しました。時間を置いて再試行してください。", "danger")
         return redirect(url_for("todo.team_detail", team_id=team.id))

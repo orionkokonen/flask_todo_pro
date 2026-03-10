@@ -261,10 +261,7 @@ def test_register_logs_in_user_and_shows_success_flash(client):
 
 
 def test_register_success_writes_audit_log(client, caplog):
-    """登録成功時に監査ログを書き、作成ユーザー名が記録されることを確認する。
-
-    「画面が成功した」だけでなく、「運用者があとで追跡できる記録が残るか」も守る。
-    """
+    """登録成功時に監査ログを書き、作成ユーザー名が記録されることを確認する。"""
     caplog.set_level(logging.INFO)
 
     response = client.post(
@@ -392,16 +389,11 @@ def test_register_commit_error_rolls_back_and_shows_generic_flash(
 
 
 def test_register_failure_writes_audit_log(client, monkeypatch, caplog):
-    """登録失敗時に監査ログを書き、失敗したユーザー名が記録されることを確認する。
-
-    失敗ログは、問い合わせ対応や不正アクセス調査の手がかりになる。
-    そのため、DB エラー時でもログが抜けないことをテストで固定する。
-    """
+    """登録失敗時に監査ログを書き、失敗したユーザー名が記録されることを確認する。"""
     original_commit = db.session.commit
     state = {"failed_once": False}
 
     def flaky_commit():
-        # DB 側で何か問題が起きた状況を、テスト内でわざと再現する。
         if not state["failed_once"]:
             state["failed_once"] = True
             raise SQLAlchemyError("forced failure")

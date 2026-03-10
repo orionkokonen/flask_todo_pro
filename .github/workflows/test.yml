@@ -1,8 +1,6 @@
 name: Run Tests
 
 on:
-  # master へ変更が入るときに毎回テストし、
-  # 「ローカルでは動いたのに GitHub 上では壊れていた」を減らす。
   push:
     branches: [master]
   pull_request:
@@ -13,13 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # 複数の Python バージョンで試し、
-        # 片方では動くがもう片方では壊れる、という差を早めに見つける。
         python-version: ["3.11", "3.12"]
 
     env:
-      # CI でも create_app() が必要とする SECRET_KEY を用意しておく。
-      # テスト専用なので、本番用の秘密値ではない。
       SECRET_KEY: "ci-test-secret"
 
     steps:
@@ -29,8 +23,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          # requirements.txt はアプリ本体の依存関係、
-          # pytest はテストを実行するための道具。
           pip install -r requirements.txt
           pip install pytest
       - name: Run tests
