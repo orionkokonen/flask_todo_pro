@@ -2,8 +2,7 @@
 
 タスクを TODO / DOING / DONE / WISH の 4 列に振り分けて一覧表示する。
 フィルタリング（スコープ・プロジェクト・キーワード・完了表示切替）もここで処理する。
-検索キーワードでは `%` と `_` を普通の文字として扱い、
-SQL のワイルドカードとして暴れないようにしている。
+検索キーワードの `%` と `_` は SQL のワイルドカードとして解釈されないようエスケープしている。
 タスクの作成・編集・削除は routes_tasks.py が担当。
 """
 from __future__ import annotations
@@ -25,11 +24,11 @@ from app.todo.shared import (
 
 
 def _escape_like(term: str) -> str:
-    """LIKE 検索で特別扱いされる記号を、普通の文字として扱える形にする。
+    """LIKE 検索で特別扱いされる記号をエスケープして、通常の文字として扱えるようにする。
 
-    `%` は「何文字でも」、`_` は「1文字なら何でも」という意味を持つ。
-    ユーザーがそれらを検索文字として入力した時に、
-    意図しない広い一致にならないようエスケープする。
+    `%` は「何文字でも」、`_` は「任意の 1 文字」を表す LIKE のメタ文字。
+    ユーザーがこれらを検索語として入力したときに、
+    意図より広い範囲にマッチしないようにエスケープする。
     """
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
@@ -54,8 +53,8 @@ def board():
 
     # --- 2. アクセス可能なプロジェクトとタスクを DB から取得 ---
     # selectinload:
-    # 各 project ごとに team を取りに行くと問い合わせ回数が増えるので、
-    # 先にまとめて読んで「1件ずつ追加問い合わせ」が起きるのを防ぐ。
+    # project ごとに team を個別取得すると N+1 問題が起きるため、
+    # まとめて先読みして「1件ごとの追加クエリ」を防ぐ。
     projects = (
         get_accessible_projects_query(team_ids)
         .options(selectinload(Project.team))
@@ -114,8 +113,8 @@ def board():
     def by_status(status: str):
         return [task for task in tasks if task.status == status]
 
-    # テンプレート側へは 1 つの辞書だけ渡す。
-    # 「列ごとに別々の変数を渡す」より追いやすく、列の追加や変更にも強い。
+    # テンプレートには 1 つの辞書でまとめて渡す。
+    # 列ごとに変数を分けるより管理しやすく、列の追加・変更にも対応しやすい。
     tasks_by_status = {
         Task.STATUS_TODO: by_status(Task.STATUS_TODO),
         Task.STATUS_DOING: by_status(Task.STATUS_DOING),

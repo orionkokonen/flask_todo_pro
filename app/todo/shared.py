@@ -47,8 +47,8 @@ def get_accessible_projects_query(team_ids: list[int] | None = None):
     team = (
         Project.query.filter(Project.team_id.in_(team_ids))
         if team_ids
-        # チーム未所属なら「チーム案件は 0 件」を SQL として明示する。
-        # db.false() にしておくと、クエリの意図が読みやすい。
+        # チームに所属していない場合、チームプロジェクトは 0 件であることを SQL で明示する。
+        # db.false() を使うと「常に一致しない」という意図がコードから読み取りやすい。
         else Project.query.filter(db.false())
     )
     return personal.union(team)

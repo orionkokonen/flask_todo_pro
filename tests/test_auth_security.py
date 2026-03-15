@@ -26,7 +26,7 @@ def test_login_rejects_external_next_redirect(client, create_user):
     """攻撃者が next=https://evil.com を埋め込んだ場合に外部 URL へリダイレクトされないことを確認する。
 
     Open Redirect 攻撃（フィッシング誘導）のリグレッションテスト。
-    ログイン成功後は必ずボードトップへ退避し、evil.com は Location に含まれてはならない。
+    ログイン成功後は必ずボードトップへリダイレクトし、evil.com は Location に含まれてはならない。
     """
     create_user("alice", "password123")
 

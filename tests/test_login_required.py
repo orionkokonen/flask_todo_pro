@@ -21,7 +21,7 @@ import pytest
     ],
 )
 def test_protected_routes_redirect_to_login(client, path):
-    """保護ページは未ログイン時にログイン画面へ逃がすことを確認する。"""
+    """保護ページは未ログイン時にログイン画面へリダイレクトすることを確認する。"""
     response = client.get(path, follow_redirects=False)
 
     assert response.status_code == 302

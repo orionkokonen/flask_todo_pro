@@ -90,8 +90,8 @@ def task_new():
         )
         try:
             db.session.add(task)
-            # commit() は本当に保存を確定する最後の壁。
-            # ここで失敗しても次の保存が詰まらないよう rollback_session() で整える。
+            # commit() で変更を DB に確定する。
+            # ここで失敗しても次の保存が影響を受けないよう rollback_session() で後始末する。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("task create")
@@ -171,8 +171,8 @@ def task_edit(task_id: int):
         task.project = project
 
         try:
-            # 編集は既存オブジェクトを書き換えたあとで確定する。
-            # 失敗時は rollback() で「途中だけ書き換わった風」に見える状態を戻す。
+            # 既存オブジェクトを書き換えたあと commit() で確定する。
+            # 失敗時は rollback() で「一部だけ変更された中途半端な状態」を元に戻す。
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("task edit")
@@ -236,14 +236,14 @@ def task_move(task_id: int):
 
     task.status = new_status
     try:
-        # 移動ボタン 1 回でも保存失敗は起こりうるので、軽い更新でも例外処理を入れておく。
+        # ボタン 1 回の小さな更新でも保存失敗は起こりうるため、例外処理を省かない。
         db.session.commit()
     except SQLAlchemyError:
         rollback_session("task move")
         flash("ステータス更新に失敗しました。時間を置いて再試行してください。", "danger")
         return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
-    # 元の画面へ戻すと操作感が自然。
-    # 参照元が取れない場合だけ安全な既定値としてボードへ戻す。
+    # 操作前の画面へ戻す方が自然な動作に感じられる。
+    # 参照元が取れない場合はボードをデフォルトの戻り先にする。
     return redirect(safe_referrer_or(url_for("todo.board")))
 
 
@@ -290,7 +290,7 @@ def subtask_toggle(subtask_id: int):
         # 一覧から押した時も詳細から押した時も、元の画面へ自然に戻す。
         # ただし外部サイトの Referer は信用しない。
         return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
-    # 成功時も同じ考え方で安全に「元いた画面」へ戻す。
+    # 成功時も同様に、安全な方法で元の画面へ戻す。
     return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
 
 

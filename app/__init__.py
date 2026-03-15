@@ -67,15 +67,15 @@ def build_content_security_policy(*, upgrade_insecure_requests: bool = False) ->
 
 
 def create_app(config_overrides: dict[str, Any] | None = None):
-    """アプリ本体を組み立てるファクトリ関数。
+    """Flask アプリを組み立てて返すファクトリ関数。
 
-    何をする: Flask アプリを作り、設定・拡張機能・ルートを全部セットアップして返す。
-    なぜ必要: テストや本番で異なる設定を注入できるようにするため（ファクトリパターン）。
+    設定・拡張機能・ルートをすべてここでセットアップする。
+    テストと本番で異なる設定を注入できるよう、ファクトリパターンを採用している。
     """
     app = Flask(__name__)
     app.config.from_object(Config)
-    # DB 接続先は環境変数があれば本番DB、無ければローカル SQLite を使う。
-    # ここを 1 行にまとめておくと、接続先の決め方を app 側で迷わず追える。
+    # 環境変数があれば本番 DB、なければローカル SQLite にフォールバックする。
+    # 接続先の決め方を 1 行にまとめることで、ここを見れば状況がわかる。
     app.config["SQLALCHEMY_DATABASE_URI"] = Config.database_uri()
 
     # 環境変数の SECRET_KEY があれば設定に反映する。
@@ -95,10 +95,10 @@ def create_app(config_overrides: dict[str, Any] | None = None):
     if hops > 0:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
 
-    # --- Secure Cookie の自動切替 ---
-    # Secure=True → HTTPS でしか Cookie を送らない。
-    # ローカル開発は HTTP なので True だとログインできなくなる。
-    # → TESTING / DEBUG 時は自動で False にする。
+    # --- Secure Cookie の自動切り替え ---
+    # Secure=True だと HTTPS でしか Cookie が送られない。
+    # ローカル開発は HTTP なので True のままだとログインできなくなるため、
+    # TESTING / DEBUG 時は自動で False に切り替える。
     secure_cookies = not (app.config.get("TESTING") or app.config.get("DEBUG"))
     if not (config_overrides and "SESSION_COOKIE_SECURE" in config_overrides):
         app.config["SESSION_COOKIE_SECURE"] = secure_cookies
@@ -193,17 +193,17 @@ def create_app(config_overrides: dict[str, Any] | None = None):
 
     @app.errorhandler(403)
     def forbidden(e):
-        """権限がない操作を、素のエラー画面ではなく学習しやすい固定ページで返す。"""
+        """権限エラーをデフォルトの味気ない画面ではなく、専用ページで返す。"""
         return render_template("errors/403.html"), 403
 
     @app.errorhandler(404)
     def page_not_found(e):
-        """存在しない URL へのアクセス時に、利用者向けの案内ページを返す。"""
+        """存在しない URL へのアクセスに、利用者向けの案内ページを返す。"""
         return render_template("errors/404.html"), 404
 
     @app.errorhandler(500)
     def internal_server_error(e):
-        """想定外エラー時も内部情報を漏らさず、共通の 500 ページだけ返す。"""
+        """予期しないエラーでも内部情報を漏らさず、共通の 500 ページだけ返す。"""
         return render_template("errors/500.html"), 500
 
     return app

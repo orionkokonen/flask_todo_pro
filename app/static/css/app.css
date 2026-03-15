@@ -290,7 +290,7 @@ a {
   text-transform: uppercase;
 }
 
-/* 汎用カード。個別画面ごとの差より「同じ種類の情報は同じ器で出す」を優先する。 */
+/* 汎用カード。画面ごとに差をつけず、同種の情報には共通のデザインを使う。 */
 .card {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
@@ -559,7 +559,7 @@ a {
   background: linear-gradient(90deg, var(--brand-500), var(--brand-600));
 }
 
-/* 長文メモでカードの高さが暴れないよう、2 行で切って一覧性を守る。 */
+/* 長文メモでカードの高さが際限なく伸びないよう、2 行で打ち切って一覧性を保つ。 */
 .subtask-item {
   border: 1px solid rgba(23, 36, 52, 0.06);
   border-radius: 0.75rem;

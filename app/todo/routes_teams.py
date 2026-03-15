@@ -42,7 +42,7 @@ def teams():
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("team create")
-            # 一覧画面を保ったまま返すと、作成し直す文脈を失いにくい。
+            # 一覧画面をそのまま返すことで、どのチームを作ろうとしていたか見失いにくい。
             flash("チームを作成できませんでした。時間を置いて再試行してください。", "danger")
             return render_template("todo/teams.html", teams=teams_list, form=form)
         flash("チームを作成しました。")
@@ -74,17 +74,17 @@ def team_detail(team_id: int):
     )
 
     # POST: ユーザー名を入力してメンバーを追加する。
-    # このアプリでは「既に中にいる人が次の人を招待できる」設計にしている。
-    # 小さなチームで素早く増やしやすい反面、管理を厳しくしたい場合は owner 限定へ変える。
-    # owner 限定にする場合は、ここに owner_id チェックを追加する。
+    # このアプリでは「既存メンバーなら誰でも次のメンバーを招待できる」設計にしている。
+    # 小規模チームで手軽に増やせる反面、管理を厳しくしたい場合は owner 限定に変更する。
+    # その場合はここに owner_id チェックを追加する。
     if form.validate_on_submit():
         username = form.username.data.strip()
         user = User.query.filter_by(username=username).first()
-        # 画面に出す文言は 1 種類にそろえる。
-        # 「存在しないユーザー」と「既にいるユーザー」を見分けさせないため。
+        # 「存在しないユーザー」と「既にいるユーザー」でエラー文言を出し分けない。
+        # 出し分けるとどちらに当たったかを外から推測されやすくなるため。
         generic_error = "メンバーを追加できませんでした。入力内容を確認して再試行してください。"
         if not user:
-            # 理由は UI ではなくログだけに残す。運用者は追えるが、利用者へは出しすぎない。
+            # 理由はログにだけ記録する。運用者が後から確認できれば十分で、画面には出さない。
             current_app.logger.info(
                 "team member add rejected: actor_id=%s team_id=%s username=%s reason=user_not_found",
                 current_user.id,
@@ -109,7 +109,7 @@ def team_detail(team_id: int):
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("team member add")
-            # 保存だけ失敗した場合は、同じ詳細画面に戻して「誰のチームだったか」を保つ。
+            # 保存だけ失敗した場合は、同じ詳細画面に戻してチームの文脈を維持する。
             flash("メンバー追加に失敗しました。時間を置いて再試行してください。", "danger")
             return render_template(
                 "todo/team_detail.html",
@@ -149,8 +149,8 @@ def team_member_remove(team_id: int, user_id: int):
     if team_member.role == "owner":
         abort(400)
 
-    # is_member() は「中にいるか」しか見ない。
-    # 「人を外してよいか」は管理権限の話なので、owner かどうかを別に確認する。
+    # is_member() は「所属しているか」の確認だけを行う。
+    # 「誰かを外してよいか」は管理権限の問題なので、owner かどうかを別途確認する。
     if current_user.id != team.owner_id:
         abort(403)
 

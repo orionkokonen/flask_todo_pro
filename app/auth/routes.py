@@ -110,10 +110,10 @@ def register():
             # 詳細は rollback_session() 側のログへ残す。
             flash("登録を完了できませんでした。入力内容を確認して再試行してください。", "danger")
             return _render_auth_template("auth/register.html", form)
-        # 登録成功時も register 用の失敗回数は消さない。
-        # ここで毎回リセットすると、短時間に大量アカウントを作るボットを
-        # 実質的に通しやすくしてしまうため。
-        # 登録直後に自動ログインし、再入力の手間を省く。
+        # 登録成功時も register 用の失敗カウントはリセットしない。
+        # リセットしてしまうと、短時間に大量アカウントを作るボットを
+        # 事実上素通りさせてしまう恐れがあるため。
+        # 登録直後に自動でログインし、もう一度入力する手間を省く。
         login_user(user)
         flash("登録が完了しました。ログインしました。")
         # 登録後は固定ページへ飛ばす。next パラメータを使わないのは Open Redirect 対策。
@@ -154,8 +154,9 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         password_matches = False
         if user is None:
-            # 結果は使わず、「照合処理にかかった重さ」だけをそろえる。
-            # これで「存在しないユーザーだけ極端に速く終わる」差を小さくする。
+            # 結果は使わず、パスワード照合にかかる処理時間だけをそろえる。
+            # ユーザーが存在しない場合に極端に速く終わると、その速度差から
+            # アカウントの有無を推測されやすくなるため。
             check_password_hash(_TIMING_EQUALIZATION_HASH, form.password.data)
         else:
             password_matches = user.check_password(form.password.data)
@@ -164,7 +165,7 @@ def login():
             # 成功した時点で失敗回数を消し、次回ログイン時に影響が残らないようにする。
             auth_rate_limiter.reset(bucket)
             login_user(user, remember=form.remember_me.data)
-            # 監査ログ: 後で「いつ誰が入れたか」を追えるように残す。
+            # 後で「いつ誰がログインしたか」を確認できるよう監査ログとして残す。
             current_app.logger.info(
                 "login succeeded: user_id=%s username=%s ip=%s",
                 user.id,
@@ -183,7 +184,7 @@ def login():
             bucket,
             current_app.config["LOGIN_RATE_LIMIT_WINDOW_SECONDS"],
         )
-        # 監査ログ: 不自然な失敗連打があった時の手がかりにする。
+        # 不審な連続失敗が起きたときに調査できるよう、警告ログとして残す。
         current_app.logger.warning(
             "login failed: username=%s ip=%s",
             form.username.data,

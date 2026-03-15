@@ -17,20 +17,19 @@ def utc_now() -> datetime:
     """UTC（世界標準時）の現在時刻を返す。
 
     Python 3.12 で datetime.utcnow() が非推奨になったため、
-    まず「UTC だと分かる時刻」を作り、その後で DB 保存用の形に整える。
+    timezone-aware な日時を作ってから tzinfo を除去して DB 保存用の形にしている。
     """
-    # SQLite では timezone 付き日時の扱いが単純ではないため、
-    # このアプリでは「timezone 情報なし = UTC」と決めてそろえている。
-    # 方針を決めておくと、表示や比較で時差の混乱が起きにくい。
+    # SQLite は timezone 付き日時を素直に扱えないため、
+    # このアプリでは「timezone 情報なし = UTC」と統一している。
+    # 方針を固定しておくと、表示や比較で時差の混乱が起きにくい。
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Team(db.Model):
     """ユーザーをまとめる共有単位。
 
-    何のためにあるか:
-    - 個人タスクとは別に、複数人で同じプロジェクトを扱えるようにするため。
-    - owner_id を持たせることで「誰が管理者か」をはっきり決められる。
+    個人タスクとは別に、複数人で同じプロジェクトを共同管理するための仕組み。
+    owner_id で「誰が管理者か」を明確に定義している。
     """
     __tablename__ = "team"
 

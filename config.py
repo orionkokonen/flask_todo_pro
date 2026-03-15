@@ -74,13 +74,11 @@ class Config:
 
     @staticmethod
     def database_uri() -> str:
-        """接続先DBを決める。
+        """接続先 DB を決めて URL を返す。
 
-        処理の流れ:
-        1. 環境変数 DATABASE_URL / DATABASE_URI があれば PostgreSQL に接続
-        2. なければローカルの SQLite ファイルにフォールバック
-
-        なぜ必要: 本番(Render=PostgreSQL)とローカル(SQLite)で同じコードを使い回すため。
+        環境変数 DATABASE_URL / DATABASE_URI があれば PostgreSQL、
+        なければローカルの SQLite にフォールバックする。
+        本番（Render = PostgreSQL）とローカル（SQLite）を同じコードで動かすための切り替え処理。
         """
         db_url = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_URI")
         if db_url:

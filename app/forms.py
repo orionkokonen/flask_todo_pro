@@ -60,8 +60,8 @@ class RegistrationForm(FlaskForm):
         """ユーザー名の重複を DB で事前チェックする。
 
         validate_<フィールド名> というメソッド名は WTForms が自動で呼ぶ規約。
-        DB の unique 制約だけに任せると、保存時に固い例外が出て読みづらくなりやすい。
-        ここで先に止めつつ、存在有無をそのまま言わない文言にしている。
+        DB の unique 制約だけに任せると、保存時に難解な例外が出て対処しにくくなる。
+        ここで先に止めつつ、ユーザー存在の有無をそのまま伝えない文言にしている。
         """
         # 前後の空白だけ違う入力を別物として扱わないため、先に trim（余分な空白除去）する。
         normalized_username = (username.data or "").strip()
@@ -86,8 +86,8 @@ class RegistrationForm(FlaskForm):
         require_digit = current_app.config.get("PASSWORD_REQUIRE_DIGIT", True)
         require_symbol = current_app.config.get("PASSWORD_REQUIRE_SYMBOL", False)
 
-        # ON になっている条件だけエラーメッセージに含め、ユーザーに何が足りないか伝える
-        # ここを設定値から組み立てると、条件を変えても文言だけ古いまま残りにくい。
+        # 有効になっている条件だけエラーメッセージに含め、ユーザーに何が足りないか伝える。
+        # 設定値から組み立てることで、条件を変えてもメッセージが古いまま残るのを防ぐ。
         requirements = []
         if require_upper:
             requirements.append("英大文字")

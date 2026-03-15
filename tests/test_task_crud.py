@@ -264,7 +264,7 @@ def test_task_create_commit_error_rolls_back_and_keeps_session_usable(
 ):
     """タスク保存失敗時に rollback し、その後の書き込みで PendingRollbackError を残さない。
 
-    追加処理そのものより、「失敗後に次の保存まで巻き込まないこと」を主に確かめる。
+    追加処理そのものより、「失敗後に次の保存処理へ影響を残さないこと」を主に確かめる。
     """
     create_user("task_commit_user", "password123")
 

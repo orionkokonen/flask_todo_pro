@@ -97,9 +97,9 @@
   });
 
   // PWA: Service Worker を登録してオフライン対応とキャッシュ戦略を有効にする。
-  // updateViaCache: 'none' でブラウザの HTTP キャッシュに引っ張られにくくし、
-  // sw.js の更新チェック時に古い内容を掴み続けるリスクを下げる。
-  // registration.update() は登録後の更新確認だけを担当させ、失敗ログも登録失敗とは分けて出す。
+  // updateViaCache: 'none' でブラウザの HTTP キャッシュの影響を受けないようにし、
+  // sw.js の更新チェック時に古いキャッシュを使い続けるリスクを下げる。
+  // registration.update() は登録後の更新確認だけを行い、失敗ログは登録失敗とは別に出力する。
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
