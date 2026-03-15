@@ -71,11 +71,11 @@ def task_new():
         posted_project = _posted_project_or_abort()
 
     if form.validate_on_submit():
-        # POST 直後に確認済みの project をここで再利用する。
-        # 先に止めた改ざんチェックを、保存直前まで保ったまま使うため。
+        # 先に改ざんチェックを通過済みの project をそのまま流用する。
+        # 保存直前まで同じオブジェクトを使うことで、チェック後の差し替えを防ぐ。
         project = posted_project
         if form.project_id.data is not None and project is None:
-            # 保存に使うのは form 側で正規化された値なので、ここでも同じ権限確認を通す。
+            # フォームが整形した project_id を元に取得するので、ここでも改めて権限確認を通す。
             project = get_or_404(Project, form.project_id.data)
             # 他ユーザーのプロジェクトへ勝手にタスクを混ぜるのを防ぐ。
             ensure_project_access(project)
@@ -95,7 +95,7 @@ def task_new():
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("task create")
-            # 同じフォームをそのまま返すと、何を入力していたかを見失いにくい。
+            # 入力内容を保持したままフォームを返し、ユーザーが見直しやすいようにする。
             flash("タスクを追加できませんでした。時間を置いて再試行してください。", "danger")
             return render_template(
                 "todo/task_form.html",
@@ -242,8 +242,8 @@ def task_move(task_id: int):
         rollback_session("task move")
         flash("ステータス更新に失敗しました。時間を置いて再試行してください。", "danger")
         return redirect(safe_referrer_or(url_for("todo.task_detail", task_id=task.id)))
-    # 操作前の画面へ戻す方が自然な動作に感じられる。
-    # 参照元が取れない場合はボードをデフォルトの戻り先にする。
+    # 元の画面へ戻す方が操作感として自然なので、Referer を優先する。
+    # Referer が取れない場合はボードをデフォルトの戻り先にする。
     return redirect(safe_referrer_or(url_for("todo.board")))
 
 

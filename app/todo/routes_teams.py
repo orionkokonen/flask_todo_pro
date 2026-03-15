@@ -42,7 +42,7 @@ def teams():
             db.session.commit()
         except SQLAlchemyError:
             rollback_session("team create")
-            # 一覧画面をそのまま返すことで、どのチームを作ろうとしていたか見失いにくい。
+            # 一覧画面をそのまま返すことで、入力内容を確認・やり直しやすくする。
             flash("チームを作成できませんでした。時間を置いて再試行してください。", "danger")
             return render_template("todo/teams.html", teams=teams_list, form=form)
         flash("チームを作成しました。")

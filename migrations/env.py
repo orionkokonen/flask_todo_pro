@@ -65,7 +65,7 @@ def run_migrations_offline():
 def run_migrations_online():
     """オンラインモードでマイグレーションを実行する。"""
 
-    # autogenerate時に差分がない場合はリビジョンファイルを作らない。
+    # autogenerate 時に差分がない場合はリビジョンファイルを作らない。
     # 「空マイグレーション」の蓄積を防ぎ、履歴の可読性を維持する。
     def process_revision_directives(context, revision, directives):
         """差分が空なら新しい migration ファイルを作らない。

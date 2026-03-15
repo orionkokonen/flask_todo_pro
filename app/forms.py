@@ -39,7 +39,7 @@ def optional_int(value):
 class RegistrationForm(FlaskForm):
     """新規登録フォーム。
 
-    画面入力の確認だけでなく、「説明しすぎないエラーメッセージ」にする役目も持つ。
+    入力値の検証に加え、エラーメッセージが不必要な情報を漏らさないよう文言も工夫している。
     """
     username = StringField(
         "ユーザー名",
