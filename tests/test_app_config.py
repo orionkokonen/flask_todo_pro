@@ -20,6 +20,8 @@ def test_create_app_requires_secret_key_when_env_missing(monkeypatch):
 
 def test_create_app_sets_testing_cookie_security_defaults():
     """テスト環境では安全性を保ちつつ、HTTP ローカル実行が詰まらない設定になることを確認する。"""
+    # TESTING=True では「安全にしつつもローカル HTTP で動かせるか」が大事。
+    # ここが本番向けの強い設定のままだと、テスト中に Cookie が送られずログインできなくなる。
     app = create_app({"TESTING": True, "SECRET_KEY": "test-secret"})
 
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
@@ -35,6 +37,7 @@ def test_create_app_sets_testing_cookie_security_defaults():
 
 def test_create_app_sets_secure_cookies_for_non_testing_app():
     """本番相当では Cookie に Secure が付くことを確認する。"""
+    # 本番相当では HTTPS 前提に寄せ、通信中に Cookie が漏れにくい設定へ切り替わるかを見る。
     app = create_app({"SECRET_KEY": "test-secret"})
 
     assert app.config["SESSION_COOKIE_SECURE"] is True

@@ -9,4 +9,6 @@
 
 from app import create_app
 
+# create_app() に設定読込と安全確認を集約し、
+# gunicorn 側は「この app を呼ぶだけ」で済む入口にしている。
 app = create_app()

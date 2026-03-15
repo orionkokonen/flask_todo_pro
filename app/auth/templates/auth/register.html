@@ -5,6 +5,8 @@
 
 {% block content %}
 <div class="auth-panel">
+  {# 左側は登録後に何ができるかの案内。
+     「アカウントを作る理由」が先に分かると、入力の意味をつかみやすい。 #}
   <section class="auth-panel__intro">
     <p class="page-hero__eyebrow">Create account</p>
     <h1 class="page-hero__title">最初の一歩を迷わせない登録画面</h1>
@@ -18,6 +20,8 @@
     </ul>
   </section>
 
+  {# 右側は最小限の入力フォーム。
+     項目を絞っているのは、最初の登録で離脱しにくくするため。 #}
   <section class="card auth-card">
     <div class="card-body p-4 p-lg-5">
       <div class="d-flex align-items-center gap-3 mb-3">
@@ -45,6 +49,7 @@
         <div class="mb-3">
           {{ form.password.label(class_='form-label') }}
           {{ form.password(class_='form-control', placeholder=password_min_length ~ '文字以上のパスワード', autocomplete='new-password') }}
+          {# ルールを入力欄の近くに出すと、送信してから直す回数を減らせる。 #}
           <div class="form-text">{{ password_min_length }}文字以上で、推測されにくいパスワードを設定してください。</div>
           {% for e in form.password.errors %}
             <div class="text-danger small mt-1">{{ e }}</div>
@@ -61,6 +66,7 @@
 
         <div class="d-grid gap-2">
           {{ form.submit(class_='btn btn-success') }}
+          {# すでに登録済みの人が戻りやすいよう、逆向きの導線も残している。 #}
           <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">ログインへ</a>
         </div>
       </form>

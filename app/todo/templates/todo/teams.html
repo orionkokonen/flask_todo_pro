@@ -12,6 +12,8 @@
 </div>
 
 <div class="row g-3">
+  {# 左側は「今入っているチーム」の一覧。
+     作成フォームと分けることで、見る場所と作る場所の役割をはっきりさせる。 #}
   <div class="col-lg-7">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white">
@@ -26,6 +28,7 @@
                   <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                       <div class="fw-semibold">{{ t.name }}</div>
+                      {# owner バッジは「このチームを管理できる人」を一覧で見分けやすくする印。 #}
                       {% if t.owner_id == current_user.id %}
                         <span class="badge text-bg-primary">owner</span>
                       {% endif %}
@@ -43,6 +46,8 @@
     </div>
   </div>
 
+  {# 右側は新規チーム作成。
+     一覧と同じ画面に置くと、作成後にすぐ結果を見比べやすい。 #}
   <div class="col-lg-5">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white">

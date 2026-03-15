@@ -26,6 +26,7 @@ def test_team_detail_blocks_outsider_but_allows_member(
     create_user("team_outsider", "password123")
     team = create_team(owner, members=[member], name="Shared Team")
 
+    # まずチーム内ユーザーでアクセスし、正常系の見え方を固定する。
     login_response = login("team_member", "password123")
     assert login_response.status_code == 302
 
@@ -34,6 +35,7 @@ def test_team_detail_blocks_outsider_but_allows_member(
 
     _logout(client)
 
+    # 次にチーム外ユーザーへ切り替え、同じ URL が 403 になることを確かめる。
     outsider_login = login("team_outsider", "password123")
     assert outsider_login.status_code == 302
 
@@ -57,6 +59,7 @@ def test_team_task_detail_blocks_outsider_but_allows_member(
     project = create_project(owner, team=team, name="Launch")
     task = create_task(owner, project=project, title="Shared Task")
 
+    # 共有タスクでも、メンバーなら通常どおり詳細を見られる。
     login_response = login("task_member", "password123")
     assert login_response.status_code == 302
 
@@ -65,6 +68,7 @@ def test_team_task_detail_blocks_outsider_but_allows_member(
 
     _logout(client)
 
+    # チーム外の人へ切り替えると、同じ詳細 URL でも拒否されるはず。
     outsider_login = login("task_outsider", "password123")
     assert outsider_login.status_code == 302
 
@@ -89,6 +93,7 @@ def test_team_project_delete_blocks_outsider_and_keeps_project(
     login_response = login("project_outsider", "password123")
     assert login_response.status_code == 302
 
+    # URL を直接たたいても 403 で止まり、DB 側のデータが消えないことが重要。
     response = client.post(
         f"/todo/projects/{project.id}/delete",
         data={},
@@ -123,6 +128,8 @@ def test_team_task_create_blocks_outsider_using_project_id_directly(
     login_response = login("hidden_project_outsider", "password123")
     assert login_response.status_code == 302
 
+    # form の選択肢に出てこなくても、POST データ自体は書き換えられる。
+    # そのため「画面で隠す」ではなく「サーバーで拒否する」ことを確認する。
     response = client.post(
         "/todo/tasks/new",
         data={
@@ -174,6 +181,7 @@ def test_team_member_add_shows_same_generic_error_for_missing_and_existing_user(
     existing_body = existing_response.get_data(as_text=True)
     generic_error = "メンバーを追加できませんでした。入力内容を確認して再試行してください。"
 
+    # 2 つの理由で画面文言が同じなら、外から「存在するユーザーか」を推測しにくい。
     assert missing_response.status_code == 200
     assert existing_response.status_code == 200
     assert generic_error in missing_body
