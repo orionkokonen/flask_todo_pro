@@ -1,3 +1,4 @@
+## このファイルは新しい移行ファイルのひな形を作るテンプレートです。
 """${message}
 
 Revision ID: ${up_revision}

@@ -1,3 +1,4 @@
+# このファイルは ToDo 機能で共通して使う手伝い処理をまとめるファイルです。
 """todo Blueprint の共通ヘルパー群。
 
 routes_board / routes_tasks / routes_projects / routes_teams が

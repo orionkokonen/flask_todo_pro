@@ -1,3 +1,4 @@
+# このファイルは Render へデプロイするときの設定を書くファイルです。
 # render.yaml: Render Blueprint 用の公開設定。
 # 「どう起動し、どんな環境変数やDBを持つか」をコードとして残している。
 services:
