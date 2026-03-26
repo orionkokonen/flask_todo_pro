@@ -1,5 +1,2 @@
-# このファイルは開発やテストのために追加で入れるライブラリ一覧です。
-# 開発・検証専用の依存関係。
-# 本番デプロイに混ぜないことで、必要なものだけを軽く入れられる。
-# 現状は pytest だけだが、将来 linter や formatter を増やす場合もここへ足していく。
+# Extra dependencies for local development and tests.
 pytest==8.3.5
