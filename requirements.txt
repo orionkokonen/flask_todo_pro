@@ -1,4 +1,5 @@
-# Runtime dependencies for the web app.
+# このファイルはアプリを動かすために必要なライブラリ一覧です。
+# Web アプリ本体
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
@@ -6,6 +7,11 @@ Flask-WTF==1.2.1
 Flask-Migrate==4.0.7
 WTForms==3.1.2
 Werkzeug==3.0.3
+
+# `.env` 読み込み。ローカル開発で環境変数を扱いやすくする。
 python-dotenv==1.0.1
+
+# 本番サーバーと Postgres 接続ドライバ。
+# SQLite だけで動かすローカルでも、Render 本番と同じ依存関係を保つため入れている。
 gunicorn==22.0.0
 psycopg[binary]==3.3.2
