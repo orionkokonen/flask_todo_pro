@@ -1,4 +1,4 @@
-{"_comment": "このファイルはアプリをホーム画面に追加するときの設定を書くファイルです。",
+{
   "name": "Todo Pro",
   "short_name": "Todo",
   "start_url": "/",

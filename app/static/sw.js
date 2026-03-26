@@ -1,4 +1,3 @@
-// このファイルはオフライン対応やキャッシュ保存を担当する Service Worker です。
 /* Service Worker（PWA のオフライン対応）
    - 静的ファイル: キャッシュ優先（cache-first）で高速表示
    - 画面遷移（HTML）: ネットワーク優先（network-first）で常に最新を返す

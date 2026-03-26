@@ -1,4 +1,3 @@
-# このファイルは GitHub で自動テストを動かす手順を書くファイルです。
 name: CI
 
 # push と pull_request の両方でテストを走らせ、

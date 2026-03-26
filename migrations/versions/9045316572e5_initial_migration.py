@@ -1,4 +1,3 @@
-# このファイルは最初のデータベース構造を作る移行スクリプトです。
 """Initial migration
 
 Revision ID: 9045316572e5

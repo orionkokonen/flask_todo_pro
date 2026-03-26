@@ -1,4 +1,3 @@
-# このファイルは Alembic がアプリのモデルを読み込むための設定ファイルです。
 # migrations/env.py — Alembic（DBマイグレーション）の実行環境設定。
 # flask db upgrade / flask db migrate 時に自動で読み込まれる。
 import logging
