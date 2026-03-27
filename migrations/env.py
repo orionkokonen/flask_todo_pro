@@ -1,4 +1,4 @@
-# migrations/env.py — Alembic（DBマイグレーション）の実行環境設定。
+# このファイルは、データベースの変更履歴を実行するときの準備をする設定です。
 # flask db upgrade / flask db migrate 時に自動で読み込まれる。
 import logging
 from logging.config import fileConfig

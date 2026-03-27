@@ -1,4 +1,7 @@
-"""${message}
+## このファイルは、新しいデータベース変更履歴ファイルを作るためのひな形です。
+"""このファイルは、新しいデータベース変更ファイルを自動生成するときのひな形です。
+
+${message}
 
 Revision ID: ${up_revision}
 Revises: ${down_revision | comma,n}

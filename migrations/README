@@ -1,1 +1,4 @@
+このファイルは、データベース変更履歴フォルダが何のためにあるかを説明するメモです。
+
+このファイルは、この migrations フォルダが Flask 用の単一データベース設定で動くことを説明するメモです。
 Single-database configuration for Flask.

@@ -1,4 +1,4 @@
-"""todo Blueprint の共通ヘルパー群。
+"""このファイルは、ToDo機能のいろいろな画面で共通して使う小さな処理をまとめています。
 
 routes_board / routes_tasks / routes_projects / routes_teams が
 重複しがちな処理（権限チェック・クエリ組立・進捗集計）をここに集約し、

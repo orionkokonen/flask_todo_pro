@@ -1,4 +1,4 @@
-{
+{ "description": "このファイルは、アプリをホーム画面に追加したときの名前やアイコンをブラウザに伝える設定です。",
   "name": "Todo Pro",
   "short_name": "Todo",
   "start_url": "/",

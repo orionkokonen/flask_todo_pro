@@ -1,4 +1,4 @@
-"""Initial migration
+"""このファイルは、最初のデータベースの形を作るための変更履歴です。
 
 Revision ID: 9045316572e5
 Revises: 

@@ -1,4 +1,4 @@
-"""本番環境(Render / gunicorn)向けのWSGIエントリポイント。
+"""このファイルは、本番公開用にアプリを起動するときの入口です。
 
 実行方法:
     gunicorn wsgi:app

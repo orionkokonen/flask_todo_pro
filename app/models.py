@@ -1,4 +1,4 @@
-"""DB モデル定義（User / Team / Project / Task / SubTask）。
+"""このファイルは、アプリのデータをデータベースでどう持つかを決めています。
 
 各モデルに can_access() を持たせ、アクセス権チェック（認可＝誰に何を許すか）をモデル層に集約。
 テーブル間の関連は relationship() で定義し、team.members のように Python オブジェクトとして辿れる。
