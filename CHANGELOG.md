@@ -1,5 +1,6 @@
 <!-- このファイルは、このアプリで何を変えたかを時系列で残す記録です。 -->
 <!-- CHANGELOG.md: 何をどう変えたかを時系列で追うための記録。設計判断の流れを振り返る時に読む。 -->
+
 # 変更履歴
 
 このファイルは、このプロジェクトの主な変更点を時系列で記録するためのものです。
@@ -8,6 +9,7 @@
 - 日付は `YYYY-MM-DD` 形式で記録します。
 
 <!-- 日付順に読むと、「なぜ今の構成になったか」の流れを追いやすい。 -->
+
 ## [2026-03-04]
 
 ### 変更
@@ -128,3 +130,15 @@
 ### ドキュメント
 
 - 回帰確認として `.venv_work\\Scripts\\python.exe -m pytest tests/ -v` を実行し、`60 passed, 1 warning` を確認。
+
+## [2026-03-27]
+
+### 修正
+
+- ルートに `pytest.ini` を追加し、`pytest -q` / `python -m pytest -q` の探索対象を `tests/` に固定。
+- リポジトリ直下の `pytest_tmp` 系ディレクトリで権限エラーが起きても、引数なしの `pytest` 実行が収集段階で止まりにくい構成へ改善。
+
+### ドキュメント
+
+- `README.md` のテスト手順を更新し、回避策として `pytest tests -q` を案内する形から、通常の `pytest -q` / `python -m pytest -q` をそのまま使える説明へ変更。
+- 回帰確認として `.venv_work\\Scripts\\python.exe -m pytest -q`、`.venv_work\\Scripts\\python.exe -m pytest -q tests`、`.venv_work\\Scripts\\python.exe -m pytest -q -p no:cacheprovider` を実行し、いずれも `60 passed, 1 warning` を確認。
