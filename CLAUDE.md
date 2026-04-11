@@ -5,7 +5,7 @@ Flask製のTodoアプリのポートフォリオ。
 
 - 認証: ログイン/登録
 - 機能: カンバンボード、タスクCRUD、サブタスク、チーム、プロジェクト
-- セキュリティ: CSRF、CSP、Open Redirect対策、レート制限
+- セキュリティ: CSRFトークン、CSP、Open Redirect対策、レート制限
 - フロント: Jinja2 + Bootstrap 5 + PWA
 - テスト: pytest
 - デプロイ: Render + PostgreSQL + Gunicorn

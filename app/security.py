@@ -52,7 +52,7 @@ class SimpleRateLimiter:
         return entries
 
     def check(self, bucket: str, limit: int, window_seconds: int) -> tuple[bool, int]:
-        """制限内かどうかを判定する（この時点ではカウントしない）。
+        """ログイン施行時に制限内かどうかを判定する（この時点ではカウントしない）。
 
         判定と記録を分離することで「失敗時だけカウント」といった柔軟な使い方ができる。
 
