@@ -18,7 +18,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
-
+#拡張機能の準備！！！(DB、ログイン、CSRF、マイグレーション)
 # --- Flask 拡張機能のインスタンスをモジュールレベルで作る ---
 # create_app() の中で init_app() して app と紐づける（Flask のお決まりパターン）。
 db = SQLAlchemy()          # DB操作（SQLAlchemy ORM）
