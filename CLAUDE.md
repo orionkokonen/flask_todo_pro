@@ -32,13 +32,11 @@ Flask製のTodoアプリのポートフォリオ。
 
 | #   | ユニット                   | 主なファイル                  | 難度 | 優先度 | 進捗   |
 | --- | -------------------------- | ----------------------------- | ---- | ------ | ------ |
-| 0   | Python/Flask/Gitの基礎用語 | —                             | ★    | 高     | 完了 |
+| 0   | Python/Flask/Gitの基礎用語 | —                             | ★    | 高     | 完了   |
 | 1   | アプリ全体の構成           | app/\_\_init\_\_.py           | ★    | 高     | 進行中 |
 | 2   | DBモデルとリレーション     | app/models.py                 | ★★   | 高     | 未着手 |
 | 3   | 認証の仕組み               | app/auth/routes.py            | ★★   | 高     | 未着手 |
 | 4   | タスクCRUDの流れ           | app/todo/routes_tasks.py      | ★★   | 高     | 未着手 |
-| 5   | アクセス制御               | app/todo/shared.py            | ★★★  | 中     | 未着手 |
-| 6   | セキュリティ対策           | app/security.py, redirects.py | ★★★  | 中     | 未着手 |
-| 7   | フォームとバリデーション   | app/forms.py                  | ★★   | 中     | 未着手 |
-| 8   | テストの設計               | tests/                        | ★★   | 中     | 未着手 |
-| 9   | デプロイ・PWA              | render.yaml, app/static/sw.js | ★    | 低     | 未着手 |
+| 5   | セキュリティ対策           | app/security.py, redirects.py | ★★★  | 中     | 未着手 |
+| 6   | テストの設計               | tests/                        | ★★   | 中     | 未着手 |
+| 7   | デプロイ・PWA              | render.yaml, app/static/sw.js | ★    | 低     | 未着手 |
