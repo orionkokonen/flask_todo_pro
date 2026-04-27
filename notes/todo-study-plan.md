@@ -950,6 +950,50 @@ test_task_create_update_delete_via_http あたりを選んで:
 ログイン → POST /tasks/new → DBに入ったか確認 → 更新 → 削除
 「HTTP層とDB層の両方をアサートしている」点を強調
 
+やりましょう。対象は tests/test_task_crud.py (line 18) の test_task_create_update_delete_via_http です。
+
+結論
+このテストは一言でいうと、
+
+Flask の test_client で実際にHTTPリクエストを送り、タスクの作成、更新、削除が画面操作と同じ流れで成功し、DBも正しく変わることを確認する統合テストです。
+
+です。
+
+流れ
+
+create_user("crud_user", "password123")
+テスト用ユーザーをDBに作ります。
+
+login("crud_user", "password123")
+テスト用ブラウザでログインします。
+302 は「ログイン後に別ページへリダイレクトされた」という意味で、ログイン成功の確認です。
+
+client.post("/todo/tasks/new", data={...})
+タスク作成フォームを送信します。
+実装側では app/todo/routes_tasks.py (line 51) の task_new() が動き、Task(...) を作って db.session.add(task)、db.session.commit() しています。
+
+作成後にDBを直接確認します。
+Task.query.filter_by(title="Initial Task").one() で本当にDBに入ったかを確認し、description、status、due_date が送信内容どおりか見ています。
+
+client.post(f"/todo/tasks/{task_id}/edit", data={...})
+作ったタスクを更新します。
+実装側は app/todo/routes_tasks.py (line 145) の task_edit() です。既存の task.title や task.status を書き換えて commit() しています。
+
+更新後もDBを直接確認します。
+db.session.get(Task, task_id) で同じタスクを取り直し、タイトルなどが "Updated Task" に変わったか確認します。
+
+client.post(f"/todo/tasks/{task_id}/delete")
+タスク削除を送信します。
+実装側は app/todo/routes_tasks.py (line 199) の task_delete() で、db.session.delete(task)、commit() しています。
+
+最後に db.session.get(Task, task_id) is None
+DBから本当に消えたことを確認します。
+
+面接での回答テンプレ
+「代表的なテストとして、タスクCRUDのHTTPテストがあります。client.post() で実際の画面操作に近い形で、タスク作成、更新、削除のリクエストを送っています。各操作ではレスポンスが 302 で正しい画面にリダイレクトされることを確認し、その後にDBを直接見て、作成された値、更新後の値、削除後に存在しないことまで確認しています。なので、画面ルートとDB保存処理がつながって動いているかを見る統合テストです。」
+
+ここで言えると強いキーワードは HTTP経由、test_client、302リダイレクト、DBの状態確認、統合テスト です。
+
 ### ⓸ 正常系／異常系を両方書いている
 
 例：不正ステータス値は400、旧URLは404 → 「想定外の入力もテストする」姿勢
