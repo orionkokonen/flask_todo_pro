@@ -60,7 +60,7 @@ class Team(db.Model):
     def __repr__(self) -> str:
         return f"<Team {self.id} {self.name!r}>"
 
-
+#TeamMember という名前のクラスを、db.Model を継承して作っている。
 class TeamMember(db.Model):
     """Team と User をつなぐ中間テーブル。
 
