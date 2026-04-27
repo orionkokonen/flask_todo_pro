@@ -689,6 +689,87 @@ A.
 → check で判定 → 失敗したら record_failure で記録 → 成功したら reset でクリア、という流れ
 → ユニット3のQ3と完全に同じ話。認証とセットで語ると強い
 
+やりましょう。今回のテーマは 「短時間に何度もログイン失敗されたら、一時的に止める仕組み」 です。
+
+まず結論
+このアプリのレート制限は、app/security.py の SimpleRateLimiter で実装されています。
+
+面接ではこう言えれば強いです。
+
+ログイン失敗を IP ごとに記録して、直近60秒で5回を超えたら 429 Too Many Requests を返すようにしています。実装は deque に失敗時刻を保存するスライディングウィンドウ方式です。成功したログインではカウンターを reset() して、正規ユーザーが過去の失敗でロックされ続けないようにしています。
+
+コードの流れ
+見る順番はこの3つです。
+
+判定する
+app/security.py の check()
+allowed, retry_after = auth_rate_limiter.check(...)
+「今このIPはまだ試行してよいか？」を確認します。ここではまだ回数を増やしません。
+
+失敗したら記録する
+app/security.py の record_failure()
+entries.append(now)
+ログイン失敗時だけ、現在時刻を記録します。
+
+成功したらリセットする
+app/security.py の reset()
+self.\_entries.pop(bucket, None)
+正しくログインできたら、過去の失敗回数を消します。
+
+ログイン画面とのつながり
+実際に使っているのは app/auth/routes.py の login() です。
+
+特にここです。
+
+bucket = f"login:{\_client_ip()}"
+bucket は「何を、誰ごとに数えるか」の名前です。
+
+たとえば IP が 127.0.0.1 なら、
+
+login:127.0.0.1
+という単位で失敗回数を数えます。
+
+設定値は config.py にあります。
+
+LOGIN_RATE_LIMIT_ATTEMPTS = 5
+LOGIN_RATE_LIMIT_WINDOW_SECONDS = 60
+REGISTER_RATE_LIMIT_ATTEMPTS = 6
+REGISTER_RATE_LIMIT_WINDOW_SECONDS = 120
+つまりログインは 60秒間に5回失敗まで。6回目は app/auth/routes.py の \_rate_limited_response() で 429 を返します。
+
+スライディングウィンドウとは
+ざっくり言うと、
+
+「今から見て、直近60秒以内に何回失敗したか」を毎回数える方式
+
+です。
+
+app/security.py の \_prune() が、60秒より古い記録を捨てています。
+
+cutoff = now - window_seconds
+while entries and entries[0] <= cutoff:
+entries.popleft()
+deque を使っている理由は、古い時刻を先頭から高速に捨てられるからです。
+
+面接で聞かれそうな質問
+Q. なぜレート制限を入れましたか？
+
+A. パスワード総当たり攻撃を防ぐためです。短時間に何度もログイン失敗するIPを一時的に止めることで、攻撃の速度を落としています。
+
+Q. どう実装していますか？
+
+A. IPごとに失敗時刻を deque に保存しています。ログイン時に直近60秒以内の失敗回数を確認し、5回以上なら 429 Too Many Requests を返します。
+
+Q. 成功したらどうなりますか？
+
+A. ログイン成功時に reset() して、そのIPの失敗カウントを消しています。これにより、正規ユーザーが一度成功した後も過去の失敗でブロックされ続けることを防いでいます。
+
+Q. この実装の弱点は？
+
+A. メモリ上に保存しているので、アプリを再起動するとカウントは消えます。また、複数プロセスや複数サーバーではカウントを共有できません。本番でより強くするなら Redis と Flask-Limiter のような仕組みを使います。
+
+ここまでが「レート制限」の面接用コアです。次に進むなら、check() の中身を1行ずつ読んで、retry_after がどう計算されるかを一緒に見られます。
+
 ## 【ユニット6】
 
 ### ⓵ pytest の全体像を一言で説明できる
