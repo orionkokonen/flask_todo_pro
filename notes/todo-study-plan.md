@@ -825,6 +825,125 @@ app / client → テスト用Flaskアプリとテストクライアント
 create_user / create_task など → テストデータを1行で作れるヘルパー
 clear_rate_limiter（autouse）→ テスト間の状態持ち越しを防ぐ
 
+やりましょう。今回の主役は tests/conftest.py です。
+
+結論
+
+conftest.py は、pytest が自動で読み込む「テスト共通の準備置き場」です。
+
+このアプリでは主に、
+
+テスト用 Flask アプリを作る
+テスト用 SQLite DB を作る
+client.get() / client.post() できるテスト用ブラウザを用意する
+ユーザー、チーム、プロジェクト、タスクを簡単に作る
+レート制限などの状態を毎テストでリセットする
+という役割を持っています。
+
+fixture とは
+
+fixture は、ざっくり言うと「テストの前準備を関数化したもの」です。
+
+たとえば tests/conftest.py:99 の client fixture はこれです。
+
+@pytest.fixture
+def client(app):
+return app.test_client()
+テスト側では import せずに、引数に client と書くだけで使えます。
+
+def test_xxx(client):
+response = client.get("/auth/login")
+pytest が「あ、client という fixture が必要なんだな」と判断して、自動で渡してくれます。
+
+このプロジェクトの重要 fixture
+
+app_factory
+tests/conftest.py:41
+
+任意の設定で Flask アプリを作るための fixture です。中ではテストごとに一時 SQLite DB を作っています。
+
+"SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path}",
+"WTF_CSRF_ENABLED": False,
+ここが大事です。通常テストでは CSRF を無効にして、client.post() で直接フォーム送信をテストしやすくしています。
+
+app
+tests/conftest.py:86
+
+通常のテスト用 Flask アプリを1つ作ります。
+
+client
+tests/conftest.py:99
+
+Flask のテスト用ブラウザです。
+
+client.get("/todo/")
+client.post("/auth/login", data={...})
+のように、実際のブラウザ操作に近い形で確認できます。
+
+create_user
+tests/conftest.py:140
+
+テスト用ユーザーを簡単に作る helper fixture です。
+
+user = User(username=username)
+user.set_password(password)
+db.session.add(user)
+db.session.commit()
+毎回テスト内でこの処理を書くと長いので、create_user("alice", "password123") の1行で済むようにしています。
+
+login
+tests/conftest.py:158
+
+ログイン POST を簡単に呼ぶ fixture です。
+
+return client.post(
+"/auth/login",
+data={"username": username, "password": password},
+)
+実際の使われ方
+
+たとえば tests/test_task_crud.py:18 ではこうなっています。
+
+def test_task_create_update_delete_via_http(
+app,
+client,
+create_user,
+login,
+):
+これはつまり、
+
+「テスト用アプリを用意して、テスト用ブラウザを用意して、ユーザー作成 helper とログイン helper も使います」
+
+という意味です。
+
+流れはこうです。
+
+create_user("crud_user", "password123") でDBにユーザー作成
+login("crud_user", "password123") でログイン
+client.post("/todo/tasks/new", data={...}) でタスク作成
+レスポンスやDBの状態を assert で確認
+特に面接で話せるポイント
+
+この conftest.py の強いところは「テストの独立性」です。
+
+tests/conftest.py:53 でテストごとにランダムな作業フォルダを作り、tests/conftest.py:58 で専用DBファイルを作っています。
+
+そして最後に tests/conftest.py:77 以降でDBを片付けます。
+
+つまり、
+
+各テストが専用のDBを使うので、前のテストで作ったユーザーやタスクが次のテストに混ざらないようにしています。
+
+と説明できます。
+
+面接回答テンプレ
+
+質問: conftest.py は何のためにありますか？
+
+回答:
+
+pytest で複数のテストから共通利用する fixture を置くためのファイルです。このアプリでは、テスト用 Flask アプリ、テスト用DB、HTTPリクエストを送る client、ユーザーやタスクを作る helper を定義しています。各テストは引数に client や create_user と書くだけで使えるので、準備処理の重複を減らせます。また、テストごとに一時 SQLite DB を作って削除しているため、テスト間でデータが混ざらないようにしています。
+
 ### ⓷ 代表的なテストを1本、流れで説明できる (tests/test_task_crud.py:18)
 
 test_task_create_update_delete_via_http あたりを選んで:
