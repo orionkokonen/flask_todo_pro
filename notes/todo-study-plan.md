@@ -550,6 +550,104 @@ ensure_task_access(task)
 
 ### 2 認証と認可の違い — @login_required と ensure_task_access をなぜ両方使うか
 
+やりましょう。ここは一言でいうと、
+
+認証 = あなたは誰ですか？
+認可 = あなたはそれを操作していい人ですか？
+
+です。
+
+このアプリでは、タスク詳細・編集・削除などで両方使っています。
+
+@bp.route("/tasks/<int:task_id>/edit", methods=["GET", "POST"])
+@login_required
+def task_edit(task_id: int):
+task = get_or_404(Task, task_id)
+ensure_task_access(task)
+該当箇所: routes_tasks.py (line 146)
+
+@login_required の役割
+
+これは「ログインしている人だけ通す」チェックです。
+
+未ログインなら、そもそも task_edit() の中に入れません。ログイン画面へリダイレクトされます。
+
+つまりこれは、
+
+この人はログイン済みのユーザーか？
+
+を見るだけです。
+
+ただし、ここで分かるのは ログインしているかどうかだけ です。
+「そのタスクの持ち主かどうか」までは見ていません。
+
+ensure_task_access(task) の役割
+
+これは「このログインユーザーが、このタスクを触ってよいか」を見るチェックです。
+
+中身は shared.py (line 72) にあります。
+
+def ensure_task_access(task: Task) -> None:
+if not task.can_access(current_user):
+current_app.logger.warning(...)
+abort(403)
+ここで task.can_access(current_user) を呼んでいます。
+
+実際の判定は models.py (line 294) の Task.can_access() です。
+
+def can_access(self, user: User) -> bool:
+if not getattr(user, "is_authenticated", False):
+return False
+if self.project is None:
+return self.created_by_id == user.id
+return self.project.can_access(user)
+意味はこうです。
+
+プロジェクト未所属タスクなら、作成者本人だけアクセス可能
+プロジェクト所属タスクなら、プロジェクト側の権限ルールに任せる
+未ログインユーザーは常に拒否
+つまり ensure_task_access は、
+
+ログイン済みなのは分かった。では、このタスクはあなたのものですか？
+または、あなたが参加しているチーム/プロジェクトのものですか？
+
+を確認しています。
+
+なぜ両方必要か
+
+たとえば、ユーザーAのタスクIDが 10 だったとします。
+
+ユーザーBがログインした状態で、URLを直接こう打つかもしれません。
+
+/todo/tasks/10/edit
+このとき @login_required だけだと、
+
+ユーザーBはログインしているのでOK
+
+となってしまいます。
+
+でも本当は、タスク10はユーザーAのものです。
+そこで ensure_task_access(task) が必要です。
+
+ユーザーBはログイン済み → @login_required は通る
+でもタスク10の権限はない → ensure_task_access で 403
+この 403 は「ログインしていない」ではなく、ログインしているけど権限がない という意味です。エラーページにもその説明があります: 403.html (line 21)
+
+面接での答え方
+
+こう言えるとかなり良いです。
+
+@login_required は認証のために使っています。未ログインユーザーをログイン画面へ送る役割です。ただ、それだけではログイン済みの別ユーザーがURLを直接入力して他人のタスクを操作できてしまう可能性があります。そこで、DBからタスクを取得した後に ensure_task_access(task) を呼び、現在のユーザーがそのタスクにアクセスできるかを確認しています。権限がなければ 403 Forbidden を返します。認証と認可を分けることで、ログイン済みユーザー同士のデータ漏えいを防いでいます。
+
+テストでも確認されています。
+他人のタスクを編集・削除・閲覧しようとすると 403 になるテストがあります: test_task_crud.py (line 336)
+
+ここは覚え方として、
+
+@login_required = 入口で「ログインしてる？」
+ensure_task_access() = 対象データに対して「あなたのもの？」
+でOKです。
+
 ## 【ユニット5】
 
 ### ⓵ セキュリティ対策の全体像 — このアプリで入れている4本柱を一言で言えるようにする
