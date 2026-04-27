@@ -308,6 +308,167 @@ password_matches = user.check_password(form.password.data)
 
 ### ⓷Q2: ログインの流れ
 
+結論
+このアプリのログイン処理は、単にパスワードを確認するだけではありません。
+
+ユーザー名とパスワードで本人確認をして、成功したら Flask-Login の login_user() でログイン状態をセッションに保存します。
+
+見る場所はここです。
+
+app/auth/routes.py
+
+@bp.route("/login", methods=["GET", "POST"])
+def login():
+
+ログイン処理の全体の流れ
+
+1. LoginForm() でフォームを用意する
+2. POST の場合はレート制限を確認する
+3. form.validate_on_submit() で入力チェックする
+4. User.query.filter_by(username=...) でユーザーを探す
+5. user.check_password(...) でパスワードを照合する
+6. 成功したら auth_rate_limiter.reset(...) で失敗回数を消す
+7. login_user(user, remember=...) でログイン状態を作る
+8. next パラメータが安全なら元のページへ、危険なら Todo 画面へ移動する
+
+コードで見ると、中心はここです。
+
+app/auth/routes.py
+
+user = User.query.filter_by(username=form.username.data).first()
+password_matches = False
+
+if user is None:
+    check_password_hash(_TIMING_EQUALIZATION_HASH, form.password.data)
+else:
+    password_matches = user.check_password(form.password.data)
+
+意味はこうです。
+
+まず、入力されたユーザー名で DB から User を探します。
+見つかったら、入力されたパスワードと DB に保存されている password_hash を照合します。
+見つからなかった場合でも、ダミーのハッシュを使って check_password_hash() を呼んでいます。
+
+ここが少し高度なポイントです。
+
+ユーザーが存在しないときにすぐ処理を終えると、「存在しないユーザー名のときだけレスポンスが速い」という差が出る可能性があります。
+その差から、攻撃者に「このユーザー名は存在する/しない」を推測されるかもしれません。
+そのため、このアプリではユーザーが存在しない場合でもダミーハッシュで同じような計算時間をかけています。
+
+成功時の処理
+
+app/auth/routes.py
+
+if user and password_matches:
+    auth_rate_limiter.reset(bucket)
+    login_user(user, remember=form.remember_me.data)
+    ...
+    return redirect(next_page)
+
+成功したら、まずレート制限の失敗回数をリセットします。
+これは、過去に入力ミスをしていても、正しくログインできた後は通常利用に戻すためです。
+
+次に重要なのがこれです。
+
+login_user(user, remember=form.remember_me.data)
+
+login_user() は Flask-Login の関数です。
+ざっくり言うと、「このユーザーはログイン済みです」とセッションに記録します。
+
+remember=form.remember_me.data は、ログイン画面の「ログイン状態を保持する」チェックボックスに対応しています。
+チェックされていれば、ブラウザを閉じた後もログイン状態を残しやすくなります。
+
+セッションとは
+
+セッションは、「ログイン状態を覚えておく仕組み」です。
+
+HTTP は本来、1回1回のリクエストを覚えていません。
+そのため、ログイン後に別ページへ移動しても「この人はさっきログインした人だ」と判断するために、セッションを使います。
+
+次のリクエストでユーザーを復元する処理
+
+ログインした後、別のページへアクセスしたときに Flask-Login は user_id から User を復元します。
+それを担当しているのが app/models.py の load_user() です。
+
+app/models.py
+
+@login.user_loader
+def load_user(user_id: str):
+    ...
+    return db.session.get(User, parsed_user_id)
+
+つまり流れはこうです。
+
+login_user(user)
+↓
+セッションに user_id が保存される
+↓
+次のリクエストで Flask-Login が load_user(user_id) を呼ぶ
+↓
+DB から User を取り直す
+↓
+current_user として使える
+
+失敗時の処理
+
+ログインに失敗した場合は、失敗回数を記録します。
+
+app/auth/routes.py
+
+auth_rate_limiter.record_failure(
+    bucket,
+    current_app.config["LOGIN_RATE_LIMIT_WINDOW_SECONDS"],
+)
+
+これはブルートフォース攻撃対策です。
+ブルートフォース攻撃とは、パスワードを何度も試して当てようとする攻撃です。
+
+また、画面に出すエラーメッセージも工夫されています。
+
+flash("ログインに失敗しました。入力内容を確認してください。")
+
+「ユーザー名が存在しません」
+「パスワードが違います」
+のように分けていません。
+
+理由は、攻撃者に「このユーザー名は登録済みだ」と推測されにくくするためです。
+
+next パラメータと Open Redirect 対策
+
+ログイン前に保護ページへ行こうとすると、ログイン後に元のページへ戻したいことがあります。
+そのために使われるのが next パラメータです。
+
+app/auth/routes.py
+
+next_page = request.args.get("next")
+if not next_page or not is_safe_redirect_target(next_page):
+    next_page = url_for("todo.board")
+return redirect(next_page)
+
+ただし、next に外部サイトのURLを入れられると危険です。
+ログイン後に悪意あるサイトへ飛ばされる Open Redirect になる可能性があるからです。
+
+そこで is_safe_redirect_target(next_page) で安全なURLか確認しています。
+安全でなければ、デフォルトで Todo ボードへ移動します。
+
+面接回答テンプレ
+
+質問: ログイン処理の流れを説明してください。
+
+回答例:
+
+このアプリでは、Flask-Login を使ってログイン状態を管理しています。ログイン時はまずフォーム入力を検証し、ユーザー名で User を検索します。ユーザーが見つかった場合は user.check_password() で、入力パスワードと保存済みの password_hash を照合します。成功したら login_user() でセッションにログイン状態を保存し、次のリクエスト以降は user_loader で user_id から User を復元します。失敗時はレート制限のカウントを記録し、成功時はリセットします。また、next パラメータは Open Redirect にならないよう安全確認してからリダイレクトしています。
+
+追加で聞かれやすい質問
+
+「なぜユーザーが存在しないときもダミーハッシュを使うのですか？」
+
+ユーザーが存在しない場合だけすぐに処理を終えると、レスポンス時間の差からアカウントの有無を推測される可能性があるからです。そのため、存在しないユーザー名でもダミーハッシュを使ってパスワード照合に近い処理時間をかけています。
+
+「ログイン成功後、どうやってログイン状態を覚えていますか？」
+
+login_user() がセッションに user_id を保存し、次のリクエストでは Flask-Login が user_loader を使って DB から User を復元します。その結果、アプリ内では current_user としてログイン中ユーザーを扱えます。
+
 ## 【ユニット4】
 
 ### 1 CRUDの全体像 — 「作成/閲覧/編集/削除 + ステータス移動 + サブタスク」の8ルートが何をするか
