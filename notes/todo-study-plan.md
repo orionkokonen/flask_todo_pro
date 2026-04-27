@@ -146,7 +146,103 @@ ensure_task_access(task)
 ## 【ユニット3】
 
 ⓵全体像「認証」って何をしてる？
+結論
+このアプリの「認証」は、ひと言でいうと、
 
+ユーザー名とパスワードで本人確認をして、ログイン済み状態を作る仕組み
+
+です。
+
+このアプリでは主に app/auth/routes.py (line 132) が担当しています。
+
+認証の全体像
+認証まわりの流れは3つです。
+
+登録する
+/auth/register で新しいユーザーを作る
+app/auth/routes.py (line 78)
+
+ログインする
+/auth/login でユーザー名とパスワードを確認する
+app/auth/routes.py (line 132)
+
+ログアウトする
+/auth/logout でログイン状態を消す
+app/auth/routes.py (line 200)
+
+登録の流れ
+登録では、入力されたパスワードをそのままDBに保存しません。
+
+app/models.py (line 124) の set_password() で、パスワードを scrypt 方式でハッシュ化しています。
+
+self.password_hash = generate_password_hash(password, method="scrypt")
+ハッシュ化とは、「元に戻せない形に変換すること」です。
+つまりDBに保存されるのは本物のパスワードではなく、変換後の値です。
+
+面接ではこう言えます。
+
+パスワードは平文で保存せず、Werkzeug の generate_password_hash を使って scrypt 方式でハッシュ化しています。ログイン時は入力値を同じ仕組みで照合し、一致した場合だけログインさせています。
+
+ログインの流れ
+ログインでは app/auth/routes.py (line 152) あたりが中心です。
+
+流れはこうです。
+
+フォーム入力を検証する
+User.query.filter_by(username=...) でユーザーを探す
+user.check_password() でパスワードを確認する
+正しければ login_user(user) でログイン状態にする
+ログイン前に行こうとしていたページ、またはTodo画面へ移動する
+重要なのはこの行です。
+
+login_user(user, remember=form.remember_me.data)
+これは Flask-Login の機能で、「この人はログイン済み」と記録します。
+
+ログイン状態の復元
+一度ログインした後、次のリクエストでも「この人は誰か」を復元する必要があります。
+
+それを担当しているのが app/models.py (line 143) の load_user() です。
+
+@login.user_loader
+def load_user(user_id: str):
+return db.session.get(User, parsed_user_id)
+これは Flask-Login が内部で呼びます。
+セッションに保存された user_id を使って、DBから User を取り直しています。
+
+専門用語
+セッション は、ざっくり言うと「ログイン状態を覚えておく仕組み」です。
+
+HTTPは本来、1回1回のリクエストを覚えていません。
+なので、ログイン後も「さっきログインした人だよ」と判断するために、セッションを使います。
+
+認証と認可の違い
+ここは面接で聞かれやすいです。
+
+認証は、
+
+あなたは誰ですか？
+
+認可は、
+
+あなたはこのデータを操作していいですか？
+
+このアプリだと、
+
+@login_required
+は認証寄りです。
+「ログインしている人だけ入れる」という門番です。
+
+一方で、前回ユニット2で見た can_access() は認可です。
+「ログイン済みでも、そのタスクを見ていい人か？」を判断します。
+
+面接回答テンプレ
+質問: このアプリの認証はどう実装していますか？
+
+回答例:
+
+Flask-Login を使ってログイン状態を管理しています。ユーザー登録時にはパスワードを平文保存せず、Werkzeug の generate_password_hash で scrypt ハッシュ化してDBに保存しています。ログイン時はユーザー名で User を検索し、check_password_hash で入力パスワードを照合します。成功したら login_user() でセッションにログイン状態を保存し、保護されたページは @login_required で未ログインアクセスを防いでいます。
+
+補足として、app/init.py (line 32) に Git の競合マーカーが残っています。学習とは別で、アプリ実行前には直した方がいい状態です。
 ⓶Q1: パスワードはハッシュ化 (scrypt)
 
 ⓷Q2: ログインの流れ
