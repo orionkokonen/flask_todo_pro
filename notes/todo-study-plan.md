@@ -998,6 +998,67 @@ DBから本当に消えたことを確認します。
 
 例：不正ステータス値は400、旧URLは404 → 「想定外の入力もテストする」姿勢
 
+やりましょう。ここは面接でかなり話しやすいポイントです。
+
+結論
+「正常系」は、想定どおりの操作が成功するテスト。
+「異常系」は、不正な入力・古いURL・他人のデータ操作などを、ちゃんと拒否できるかを見るテストです。
+
+このプロジェクトだと、tests/test_task_crud.py (line 1) の先頭コメントにもう答えが書いてあります。
+
+# 正常系: 作成→更新→削除の一連フロー、ステータス移動（/move）
+
+# 異常系: 不正ステータス値の拒否（400）、旧 URL（/set_status）が 404 を返すか
+
+コードで見る
+正常系の代表は test_task_create_update_delete_via_http (line 18) です。
+
+これは、
+
+ログイン
+→ タスク作成
+→ DBに入ったか確認
+→ タスク更新
+→ DBが変わったか確認
+→ タスク削除
+→ DBから消えたか確認
+という「普通に使ったら成功する流れ」を見ています。
+
+もう1つの正常系は test_task_move_updates_status_via_current_route (line 152) です。
+/todo/tasks/<id>/move に正しい status を送ったら、DBの status が DONE に変わることを確認しています。
+
+一方、異常系は test_task_move_rejects_invalid_status (line 93) です。
+
+data={"status": "INVALID"}
+assert response.status_code == 400
+assert persisted.status == Task.STATUS_TODO
+ここが大事です。
+ただ「400になる」だけでなく、DBの値が変わっていないことまで確認しています。
+
+実装側では app/todo/routes_tasks.py (line 231) でこうなっています。
+
+new_status = (request.form.get("status") or "").upper()
+
+if new_status not in Task.VALID_STATUSES:
+abort(400)
+許可される値は app/models.py (line 231) のこれです。
+
+VALID_STATUSES = (STATUS_TODO, STATUS_DOING, STATUS_DONE, STATUS_WISH)
+つまり、画面では選択式にしていても、送信値は改ざんできるので、サーバー側でも必ず確認しています。
+
+面接回答テンプレ
+こう言えれば強いです。
+
+テストでは正常系と異常系の両方を書いています。正常系では、タスクの作成・更新・削除やステータス移動がHTTP経由で成功し、DBも期待どおり変わることを確認しています。異常系では、不正なステータス値を送った場合に400で拒否され、DBが変更されないことまで確認しています。画面側の入力を信用せず、サーバー側でも VALID_STATUSES で再チェックしている点がポイントです。
+
+追加で言えるとさらに良いです。
+
+また、旧URL /set_status が404になるテストや、他人のタスクを編集・削除・閲覧しようとすると403になるテストもあります。つまり「うまく動くこと」だけでなく、「危ない操作をちゃんと止めること」もテストしています。
+
+覚えるキーワードはこれです。
+
+正常系、異常系、400 Bad Request、403 Forbidden、404 Not Found、DBが変わらないことの確認、サーバー側バリデーション。
+
 ## 【ユニット7】
 
 ### ⓵ デプロイ構成を一言で言える(render.yaml)
