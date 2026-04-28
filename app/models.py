@@ -44,6 +44,8 @@ class Team(db.Model):
     # チームを消したら、そのチーム専用のメンバー情報やプロジェクトも一緒に片づける。
     # lazy="dynamic":
     # team.members を「すぐ全部読むリスト」ではなく「あとで絞り込める問い合わせ」として扱う。
+
+    #Team のインスタンスから .members と書くと、その チームに紐づく TeamMember の一覧を取り出せるようにする
     members = db.relationship(
         "TeamMember",
         back_populates="team",
@@ -67,20 +69,23 @@ class TeamMember(db.Model):
     Team と User は「多対多」（1人が複数チーム、1チームに複数人）なので、
     間にこの表を挟んで「誰がどのチームに、どんな役割で入っているか」を記録する。
     """
-    #DB上のテーブル名を "team_member" に指定している。
+    #DB上のテーブル名を "team_member" に指定
     __tablename__ = "team_member"
 
     # team_id + user_id を複合主キー（2列でユニーク）にし、同じユーザーの二重登録を DB レベルで防ぐ
+
     #team テーブルの id 列を参照する整数の列を作り、それを主キーの一部にする
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), primary_key=True)
+    #上と同じ構造で、今度は user テーブルの id を参照する列
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
-    #「最大20文字の文字列で、未指定なら "member"、空(NULL)は禁止」の列。
+    #最大20文字の文字列で、未指定なら "member"、空(NULL)は禁止
     role = db.Column(db.String(20), default="member", nullable=False)  # owner / member
-    joined_at = db.Column(db.DateTime, default=utc_now, nullable=False)
-
+    #日時型で、未指定なら utc_now() の結果が入り、空は禁止
     team = db.relationship("Team", back_populates="members")
     user = db.relationship("User", back_populates="team_memberships")
 
+    #「このメソッドは、インスタンスに依存しない静的メソッドですよ」という印。
+    #「インスタンスを作らずにメソッドを呼べる」のが嬉しいポイント!!
     @staticmethod
     def is_member(user_id: int, team_id: int) -> bool:
         """指定ユーザーがチームに所属しているか確認する。
@@ -117,6 +122,7 @@ class User(UserMixin, db.Model):
         foreign_keys="Task.created_by_id",
         lazy="dynamic",
     )
+    #User のインスタンスから .team_memberships で、そのユーザーが参加している TeamMember 一覧を取れる
     team_memberships = db.relationship(
         "TeamMember",
         back_populates="user",

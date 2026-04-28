@@ -76,6 +76,7 @@ def ensure_task_access(task: Task) -> None:
     プロジェクト未所属なら作成者本人かどうかで判定する。
     """
     if not task.can_access(current_user):
+        #不正アクセスの試行をログに記録
         current_app.logger.warning(
             "task access forbidden: user_id=%s task_id=%s",
             getattr(current_user, "id", None),
