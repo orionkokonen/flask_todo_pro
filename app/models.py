@@ -88,6 +88,8 @@ class TeamMember(db.Model):
     #今度は User とつなぐ。.user で User オブジェクトが取れる
     user = db.relationship("User", back_populates="team_memberships")
 
+    #「このメソッドは、インスタンスに依存しない静的メソッドですよ」という印。
+    #「インスタンスを作らずにメソッドを呼べる」のが嬉しいポイント!!
     @staticmethod
     def is_member(user_id: int, team_id: int) -> bool:
         """指定ユーザーがチームに所属しているか確認する。
