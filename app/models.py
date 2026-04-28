@@ -67,11 +67,14 @@ class TeamMember(db.Model):
     Team と User は「多対多」（1人が複数チーム、1チームに複数人）なので、
     間にこの表を挟んで「誰がどのチームに、どんな役割で入っているか」を記録する。
     """
+    #DB上のテーブル名を "team_member" に指定している。
     __tablename__ = "team_member"
 
     # team_id + user_id を複合主キー（2列でユニーク）にし、同じユーザーの二重登録を DB レベルで防ぐ
+    #team テーブルの id 列を参照する整数の列を作り、それを主キーの一部にする
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
+    #「最大20文字の文字列で、未指定なら "member"、空(NULL)は禁止」の列。
     role = db.Column(db.String(20), default="member", nullable=False)  # owner / member
     joined_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
