@@ -44,6 +44,8 @@ class Team(db.Model):
     # チームを消したら、そのチーム専用のメンバー情報やプロジェクトも一緒に片づける。
     # lazy="dynamic":
     # team.members を「すぐ全部読むリスト」ではなく「あとで絞り込める問い合わせ」として扱う。
+
+    #Team のインスタンスから .members と書くと、その チームに紐づく TeamMember の一覧を取り出せるようにする
     members = db.relationship(
         "TeamMember",
         back_populates="team",
@@ -74,12 +76,16 @@ class TeamMember(db.Model):
 
     #team テーブルの id 列を参照する整数の列を作り、それを主キーの一部にする
     team_id = db.Column(db.Integer, db.ForeignKey("team.id"), primary_key=True)
-
+    #上と同じ構造で、今度は user テーブルの id を参照する列
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), primary_key=True)
+    #最大20文字の文字列で、未指定なら "member"、空(NULL)は禁止
     role = db.Column(db.String(20), default="member", nullable=False)  # owner / member
+    #日時型で、未指定なら utc_now() の結果が入り、空は禁止
     joined_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
+    #TeamMember のインスタンスから .team と書くだけで、紐づく Team オブジェクトを取り出せるようにする
     team = db.relationship("Team", back_populates="members")
+    #今度は User とつなぐ。.user で User オブジェクトが取れる
     user = db.relationship("User", back_populates="team_memberships")
 
     @staticmethod
@@ -118,6 +124,7 @@ class User(UserMixin, db.Model):
         foreign_keys="Task.created_by_id",
         lazy="dynamic",
     )
+    #User のインスタンスから .team_memberships で、そのユーザーが参加している TeamMember 一覧を取れる
     team_memberships = db.relationship(
         "TeamMember",
         back_populates="user",
