@@ -150,6 +150,7 @@ class User(UserMixin, db.Model):
 
 
 # Flask-Login がセッション（ログイン状態）からユーザーを復元する際に呼ばれるコールバック
+#Cookie に入っている user_id を使って、DB から User オブジェクトを復元する関数
 @login.user_loader
 def load_user(user_id: str):
     """セッションに保存された user_id から User を取り出す。"""

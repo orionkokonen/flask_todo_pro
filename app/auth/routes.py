@@ -173,6 +173,7 @@ def login():
         if user and password_matches:
             # 成功した時点で失敗回数を消し、次回ログイン時に影響が残らないようにする。
             auth_rate_limiter.reset(bucket)
+            #「この人はログイン済みです」とセッションに記録する。
             login_user(user, remember=form.remember_me.data)
             # 後で「いつ誰がログインしたか」を確認できるよう監査ログとして残す。
             current_app.logger.info(
