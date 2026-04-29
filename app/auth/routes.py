@@ -101,6 +101,7 @@ def register():
         if not allowed:
             return _rate_limited_response("auth/register.html", form, retry_after)
 
+    #入力内容が正しい形式かをチェック
     if form.validate_on_submit():
         #ユーザーを作って、パスワードを「ハッシュ化してから」保存
         user = User(username=form.username.data)
@@ -154,6 +155,7 @@ def login():
         if not allowed:
             return _rate_limited_response("auth/login.html", form, retry_after)
 
+    #入力内容が正しい形式かをチェック
     if form.validate_on_submit():
         # まずユーザー名で探し、見つかったときだけパスワード照合へ進む。
         # ただし画面には「どちらが違ったか」は出さず、推測材料を増やさない。
@@ -164,7 +166,7 @@ def login():
             # ユーザーが存在しない場合に極端に速く終わると、その速度差から
             # アカウントの有無を推測されやすくなるため。
             check_password_hash(_TIMING_EQUALIZATION_HASH, form.password.data)
-        else:
+        else:#入力されたパスワードを、保存済みハッシュと突き合わせる
             password_matches = user.check_password(form.password.data)
 
         if user and password_matches:
