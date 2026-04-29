@@ -102,6 +102,7 @@ def register():
             return _rate_limited_response("auth/register.html", form, retry_after)
 
     if form.validate_on_submit():
+        #ユーザーを作って、パスワードを「ハッシュ化してから」保存
         user = User(username=form.username.data)
         user.set_password(form.password.data)
         try:
