@@ -169,6 +169,7 @@ def login():
         else:#入力されたパスワードを、保存済みハッシュと突き合わせる
             password_matches = user.check_password(form.password.data)
 
+        #ユーザーが見つかった (user が None じゃない) かつ パスワードも一致したとき
         if user and password_matches:
             # 成功した時点で失敗回数を消し、次回ログイン時に影響が残らないようにする。
             auth_rate_limiter.reset(bucket)
