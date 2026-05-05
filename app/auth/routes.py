@@ -145,6 +145,7 @@ def login():
     form = LoginForm()
     bucket = f"login:{_client_ip()}"
 
+    #レート制限チェック
     if request.method == "POST":
         # パスワード総当たり（ブルートフォース）攻撃を防ぐためのレート制限
         allowed, retry_after = auth_rate_limiter.check(
