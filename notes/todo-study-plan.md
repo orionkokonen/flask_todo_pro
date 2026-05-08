@@ -214,9 +214,9 @@ login_user が user_id を Flask のセッションに入れ、SECRET_KEY で署
    - ダミーハッシュはアカウント列挙(タイミング攻撃)対策
    - login_user が user_id を Cookie に入れ、次回は user_loader が復元する
 
-## 【ユニット4】CRUD と認可
+## ✅【ユニット4】CRUD と認可
 
-### 1. CRUD の全体像 — 8ルートが何をするか口で言えるようにする
+### ✅1. CRUD の全体像 — 8ルートが何をするか口で言えるようにする
 
 0. ゴール
    面接で「タスク機能ってどんな構成?」と聞かれたら、
@@ -297,7 +297,7 @@ GETで削除できると、外部サイトの `<img src="…/delete">` だけで
    - 共通の作法 = `@login_required`(認証) + `ensure_task_access`(認可) の2段
    - クライアントを信用しない = project_id も status もサーバー側で再検証
 
-### 2. 認証と認可は別物 — @login_required と ensure_task_access をなぜ両方使うか
+### ✅2. 認証と認可は別物 — @login_required と ensure_task_access をなぜ両方使うか
 
 0. ゴール
    「認証=あなたは誰? / 認可=あなたに何が許される? 全ルートで `@login_required`(認証) + `ensure_task_access`(認可) の2段チェックを通す」が言えればOK。
