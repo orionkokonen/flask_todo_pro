@@ -21,11 +21,11 @@ services:
         fromDatabase:
           # Render Blueprint が Web サービスと Postgres を同時に作成し、接続文字列を自動注入する。
           # アプリ側では DATABASE_URL 環境変数を読むだけでよく、接続先をコードに埋め込まない。
-          name: flask-todo-db-recovery
+          name: flask-todo-db-2026-05
           property: connectionString
 
 databases:
-  - name: flask-todo-db-recovery
+  - name: flask-todo-db-2026-05
     plan: free
     databaseName: flask_todo_recovery
     user: flask_todo_recovery
