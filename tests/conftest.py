@@ -28,7 +28,7 @@ from app.security import auth_rate_limiter
 TEST_RUNTIME_ROOT = Path(__file__).resolve().parent / "_runtime_tmp"
 TEST_RUNTIME_ROOT.mkdir(exist_ok=True)
 
-
+#autouse=True が付いてるからこれだけが「全テストで、引数に書かなくても自動で動く」fixture。
 @pytest.fixture(autouse=True)
 def clear_rate_limiter():
     # レート制限はプロセス内で状態を保持するため、テスト間でカウンターが引き継がれてしまう。
