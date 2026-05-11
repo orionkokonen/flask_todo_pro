@@ -3,10 +3,24 @@
 テスト設計の方針:
 - テストごとに repo ローカルの一時 SQLite DB を作成し、テスト間のデータ混入を防ぐ。
 - WTF_CSRF_ENABLED=False にして CSRF トークン検証をスキップし、
-  テストクライアントから直接 POST できるようにしている
-  （本番の CSRF 保護は別途専用テストで確認する）。
+テストクライアントから直接 POST できるようにしている
+（本番の CSRF 保護は別途専用テストで確認する）。
 - 各フィクスチャは app_context の外から呼ばれることを想定し、
-  内部で app_context を明示的に取得している。
+内部で app_context を明示的に取得している。
+
+
+#	fixture名	役割
+1	clear_rate_limiter	レート制限リセット(autouse)
+2	app_factory	設定を変えてアプリを作れる工場
+3	app	テスト用Flaskアプリ
+4	client	テスト用ブラウザ
+5	csrf_app	CSRF有効版のアプリ
+6	csrf_client	CSRF有効版のクライアント
+7	create_user	ユーザー作成ヘルパー
+8	login	ログインヘルパー
+9	create_team	チーム作成ヘルパー
+10	create_project	プロジェクト作成ヘルパー
+11	create_task	タスク作成ヘルパー
 """
 from __future__ import annotations
 

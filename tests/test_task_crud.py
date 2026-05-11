@@ -22,29 +22,60 @@ def test_task_create_update_delete_via_http(
     login,
 ):
     """タスクの作成→更新→削除を HTTP 経由で一連実行し、各フェーズで DB が正しく変化するか確認。"""
+    # メモ: なぜ作成→更新→削除を1関数にまとめる？
+    # → CRUD が「1つのライフサイクル」として正しく繋がることを確認したいから。
+    # → 分けると更新テストの前準備で「再びユーザー作成→タスク作成」が必要で冗長。
+    # → ただし「異なるシナリオ」は別テストに分ける:
+    #     ・不正ステータスで作成 → 別テスト（異常系）
+    #     ・他人のタスクを編集 → 別テスト（認可）
+    # → 基準:「同じ正常系ライフサイクル=1本 / 違うシナリオ=別テスト」
+
+    # メモ: ━━ Arrange（前準備）━━
+    # テストは AAA（Arrange→Act→Assert）の3段で書く。
+    # 料理で例えると「材料切る → 炒める → 味見する」🍳
     create_user("crud_user", "password123")
 
     login_response = login("crud_user", "password123")
+    # メモ: 前提条件もassertする理由
+    # → 後の作成が失敗した時に「タスクが作れなかった」のか「ログインできてなかった」のか
+    #   失敗の原因を切り分けられるようにするため。
     assert login_response.status_code == 302
 
     # --- 作成フェーズ ---
+    # メモ: ━━ Act + Assert（作成）━━
+    # ★面接のキモ★ 統合テストでは HTTPレスポンス（画面の振る舞い）と
+    # DB状態（データが本当に保存されたか）の両方をassertする「二重チェック」を行う。
+    # 片方だけだと見逃すバグの例:
+    #   HTTPだけ確認 → 「302で /todo/ に戻ったが実はDB書き込みがロールバック」を見逃す
+    #   DBだけ確認  → 「DBには入ったがユーザーには500エラー画面が出ていた」を見逃す
+    # 覚え方: 「表（HTTP）と裏（DB）、両方見る」👀
     create_due_date = date.today() + timedelta(days=5)
     create_response = client.post(
         "/todo/tasks/new",
         data={
             "title": "Initial Task",
             "description": "initial description",
+            # メモ: Task.STATUS_TODO → 文字列 "TODO" を直書きせず、モデル側の定数を参照する。
+            # （マジックストリング＝コード中に直書きされた意味不明な文字列リテラル、を避ける）
             "status": Task.STATUS_TODO,
             "due_date": create_due_date.isoformat(),
             "project_id": "",
         },
+        # メモ: follow_redirects=False → リダイレクトを追いかけず、最初のレスポンス（302）で止める。
+        # 「リダイレクトしたか」を確認したいので明示OFF にしている。
         follow_redirects=False,
     )
 
+    # メモ: 観点① HTTPレスポンス（画面の振る舞い）
     assert create_response.status_code == 302
     assert create_response.headers["Location"].endswith("/todo/")
 
+    # メモ: 観点② DB状態（データが本当に保存されたか）
+    # with app.app_context(): → FlaskでDB操作する時に必要な「アプリケーションコンテキスト」に入る。
+    # （アプリケーションコンテキスト＝Flaskが「今どのアプリで動いているか」を把握する仕組み）
     with app.app_context():
+        # メモ: filter_by(...).one() → 「ちょうど1件あるはず」の宣言。
+        # 0件や2件以上だと例外を投げる。テストでは「期待する状態を強く宣言する」のが大事。
         task = Task.query.filter_by(title="Initial Task").one()
         task_id = task.id
         assert task.description == "initial description"
@@ -52,6 +83,7 @@ def test_task_create_update_delete_via_http(
         assert task.due_date == create_due_date
 
     # --- 更新フェーズ ---
+    # メモ: 更新フェーズも同じく HTTP × DB の二重チェックパターン。
     update_due_date = date.today() + timedelta(days=2)
     update_response = client.post(
         f"/todo/tasks/{task_id}/edit",
@@ -69,6 +101,9 @@ def test_task_create_update_delete_via_http(
     assert update_response.headers["Location"].endswith(f"/todo/tasks/{task_id}")
 
     with app.app_context():
+        # メモ: db.session.get(Task, task_id) → 主キー（id）で1件取得。
+        # 作成時は filter_by().one() で「あるはず」を強く宣言したが、
+        # 更新後は ID が分かっているので主キー取得の方が素直。
         task = db.session.get(Task, task_id)
         assert task is not None
         assert task.title == "Updated Task"
@@ -77,6 +112,8 @@ def test_task_create_update_delete_via_http(
         assert task.due_date == update_due_date
 
     # --- 削除フェーズ ---
+    # メモ: 削除フェーズも同じく HTTP × DB の二重チェック。
+    # 削除フェーズの肝は「消えた」ことを is None で確認すること。
     delete_response = client.post(
         f"/todo/tasks/{task_id}/delete",
         data={},
@@ -87,6 +124,19 @@ def test_task_create_update_delete_via_http(
     assert delete_response.headers["Location"].endswith("/todo/")
 
     with app.app_context():
+        # メモ: db.session.get() は見つからないと None を返す → is None でチェック。
+        # 「あるはず」と「ないはず」で関数を使い分けるのが定石:
+        #   filter_by().one()        → あるはず（0件/複数件なら例外）
+        #   db.session.get() is None → ないはず（消えたことを確認）
+        #
+        # 【面接で60秒で話す形】
+        # 「タスクCRUDのテストを例にすると、まず Arrange で create_user と login の fixture を
+        #  呼んで、ログイン成功(302)を前提条件としてassertします。次に Act + Assert として
+        #  作成→更新→削除を順に client.post で実行し、各フェーズで HTTPレスポンスとDB状態の
+        #  両方をassertする二重チェックを行います。これは『302が返ったが実はDB書き込みが
+        #  ロールバックしていた』『DBには入ったが画面では500が出ていた』のような片方だけだと
+        #  見逃すバグを防ぐためです。最後に db.session.get(Task, task_id) is None で
+        #  行が消えたことを確認しています」
         assert db.session.get(Task, task_id) is None
 
 
