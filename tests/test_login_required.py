@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-
+#下の関数を、リスト内の値を順番に path に入れて4回実行してくださいという指示
 @pytest.mark.parametrize(
     "path",
     [
