@@ -8,7 +8,7 @@ Flask 3 / SQLAlchemy / WTForms / PWA で構成した、個人利用とチーム�
 
 - Repository: https://github.com/orionkokonen/flask_todo_pro
 - README更新基準日: 2026-03-11
-- 確認環境: Python 3.14.3
+- 確認環境: Python 3.14.6
 
 <!-- まず「今どこまで動くか」を読むと、未実装との境界がつかみやすい。 -->
 ## 現在の実装状態
@@ -133,10 +133,10 @@ Flask 3 / SQLAlchemy / WTForms / PWA で構成した、個人利用とチーム�
 
 ## テスト状況
 
-2026-03-27 に次のコマンドで確認しました。
+2026-08-11 に次のコマンドで確認しました。
 
 ```powershell
-.\.venv_work\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
 ```
 
 結果:

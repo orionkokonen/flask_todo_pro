@@ -17,6 +17,8 @@
 - Render の無料 PostgreSQL に利用期限があるため、`render.yaml` の DB 定義を新しいインスタンス（`flask-todo-db-2026-08-11`）へ差し替え。`fromDatabase` の参照名も同時に更新し、Blueprint 内で名前が一致する状態を維持。
 - DB 名とユーザー名から過去の名残である `recovery` を外し、作成時期が分かる `flask_todo_2026_08_11` に統一。
 - 学習ノート `notes/todo-study-plan.md` に載せていた `render.yaml` の引用が実物と食い違っていたため、現在の内容に合わせて修正。
+- `render.yaml` の構文とデプロイ設定をローカルで検証できるよう、`requirements-dev.txt` に `PyYAML` を追加。本番の `requirements.txt` には入れず、開発時のみ読み込む構成を維持。
+- README の「テスト状況」が現存しない仮想環境フォルダを参照していたため、実際に再現できるコマンドへ更新。
 
 ## [2026-03-04]
 
