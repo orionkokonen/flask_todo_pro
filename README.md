@@ -243,7 +243,7 @@ python -m flask --app wsgi.py db upgrade && gunicorn wsgi:app --bind 0.0.0.0:$PO
 - パスワードリセット機能は未実装です。
 - リアルタイム同期、通知、公開 API は未実装です。
 - 認証レート制限はインメモリ実装です。
-  - 複数 worker / 複数インスタンス構成では Redis などへの移行が必要です。
+- 複数 worker / 複数インスタンス構成では Redis などへの移行が必要です。
 
 ## 関連ドキュメント
 

@@ -1044,7 +1044,7 @@ envVars:
     value: "1"
   - key: DATABASE_URL
     fromDatabase: # ← 下のDB定義から自動注入
-      name: flask-todo-db-recovery
+      name: flask-todo-db-2026-08-11
       property: connectionString
 ```
 
@@ -1065,10 +1065,10 @@ SECRET_KEY = セッションCookieに署名する合言葉(ユニット3-3)。�
 
 ```yaml
 databases:
-  - name: flask-todo-db-recovery
+  - name: flask-todo-db-2026-08-11
     plan: free
-    databaseName: flask_todo_recovery
-    user: flask_todo_recovery
+    databaseName: flask_todo_2026_08_11
+    user: flask_todo_2026_08_11
     ipAllowList: [] # ← ★セキュリティのキモ
 ```
 

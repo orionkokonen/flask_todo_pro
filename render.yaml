@@ -21,14 +21,14 @@ services:
         fromDatabase:
           # Render Blueprint が Web サービスと Postgres を同時に作成し、接続文字列を自動注入する。
           # アプリ側では DATABASE_URL 環境変数を読むだけでよく、接続先をコードに埋め込まない。
-          name: flask-todo-db-2026-05
+          name: flask-todo-db-2026-08-11
           property: connectionString
 
 databases:
-  - name: flask-todo-db-2026-05
+  - name: flask-todo-db-2026-08-11
     plan: free
-    databaseName: flask_todo_recovery
-    user: flask_todo_recovery
+    databaseName: flask_todo_2026_08_11
+    user: flask_todo_2026_08_11
     # ipAllowList を空にすると Render 内部ネットワークからのみ接続を受け付ける。
     # Web サービスと同一環境内で完結するため、外部 IP 許可は不要。
     ipAllowList: []
